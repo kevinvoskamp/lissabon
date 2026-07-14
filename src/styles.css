@@ -1,0 +1,60 @@
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+body {
+  background: #d9d2c5;
+  font-family: 'Instrument Sans', system-ui, sans-serif;
+  color: #1f2a30;
+  -webkit-font-smoothing: antialiased;
+}
+#root {
+  min-height: 100vh;
+}
+
+/* hide scrollbars like the prototype */
+.app-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+.chiprow::-webkit-scrollbar {
+  height: 0;
+}
+
+a {
+  color: #2e5f86;
+}
+a:hover {
+  color: #234a68;
+}
+
+/* Portuguese azulejo tile pattern used in the header */
+.azulejo {
+  background-color: #1c4a68;
+  background-image: radial-gradient(circle at 0 0, transparent 9px, #2f6b93 10px, transparent 11px),
+    radial-gradient(circle at 100% 0, transparent 9px, #2f6b93 10px, transparent 11px),
+    radial-gradient(circle at 0 100%, transparent 9px, #2f6b93 10px, transparent 11px),
+    radial-gradient(circle at 100% 100%, transparent 9px, #2f6b93 10px, transparent 11px);
+  background-size: 28px 28px;
+}
+
+/* decorative tiled strip */
+.tile-strip {
+  height: 12px;
+  background-image: repeating-linear-gradient(
+    90deg,
+    #c56b4a 0 14px,
+    #f4efe6 14px 15px,
+    #274b6b 15px 29px,
+    #f4efe6 29px 30px
+  );
+}
+
+/* Login input focus */
+input:focus {
+  outline: none;
+}
