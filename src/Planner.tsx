@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { ACTIVITIES, CATS, QUIZ_SETS, seed, nid, type Activity, type CatKey, type Day } from './data'
 import { useWeather } from './useWeather'
+import Wensen from './Wensen'
 import type { Auth } from './Login'
 
 const KEY = 'lissabon-planner-v2'
 const FAV_KEY = 'lissabon-tips-favs'
 
-type Tab = 'overview' | 'ideas' | 'planning' | 'tips' | 'docs'
+type Tab = 'overview' | 'ideas' | 'wensen' | 'planning' | 'tips' | 'docs'
 
 function loadDays(): Day[] {
   try {
@@ -192,6 +193,7 @@ export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () =
   const navItems: { key: Tab; label: string }[] = [
     { key: 'overview', label: 'Overzicht' },
     { key: 'ideas', label: 'Ideeën' },
+    { key: 'wensen', label: 'Wensen' },
     { key: 'planning', label: 'Planning' },
     { key: 'tips', label: 'Tips' },
     { key: 'docs', label: 'Docs' },
@@ -240,6 +242,7 @@ export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () =
             />
           )}
           {tab === 'ideas' && <Ideas toast={toast} addActivity={addActivity} />}
+          {tab === 'wensen' && <Wensen toast={toast} onAddActivity={addActivity} />}
           {tab === 'tips' && (
             <Tips
               qItem={qItem}
