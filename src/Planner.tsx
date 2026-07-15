@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
-import { ACTIVITIES, CATS, QUIZ_SETS, seed, nid, type Activity, type CatKey, type Day } from './data'
+import { CATS, seed, nid, type Activity, type CatKey, type Day } from './data'
 import { useWeather } from './useWeather'
 import Wensen from './Wensen'
+import Quiz from './Quiz'
 import type { Auth } from './Login'
 
 const KEY = 'lissabon-planner-v3'
 const FAV_KEY = 'lissabon-tips-favs'
+const HOTEL_URL = 'https://www.jamhotels.eu/lisbon'
 
-type Tab = 'overview' | 'ideas' | 'wensen' | 'planning' | 'tips' | 'docs'
+type Tab = 'overview' | 'wensen' | 'planning' | 'quiz' | 'tips' | 'docs'
 
 function loadDays(): Day[] {
   try {
@@ -30,16 +32,6 @@ function loadFavs(): Record<string, boolean> {
     /* ignore */
   }
   return {}
-}
-
-function quizSetIndex(): number {
-  const start = new Date(2026, 6, 23)
-  const now = new Date()
-  now.setHours(0, 0, 0, 0)
-  const dayNum = Math.round((now.getTime() - start.getTime()) / 864e5)
-  if (dayNum >= 0 && dayNum < 8) return dayNum
-  const doy = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 864e5)
-  return doy % QUIZ_SETS.length
 }
 
 function countdownText(): string {
@@ -69,9 +61,6 @@ export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () =
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
   const [favTips, setFavTips] = useState<Record<string, boolean>>(loadFavs)
   const [toast, setToast] = useState('')
-  const [quizQ, setQuizQ] = useState(0)
-  const [quizChosen, setQuizChosen] = useState<number | null>(null)
-  const [quizScore, setQuizScore] = useState(0)
 
   const dragIdx = useRef<number | null>(null)
   const toastT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -136,7 +125,8 @@ export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () =
   }
   function addActivity(a: Activity) {
     const items = days[activeDay].items.slice()
-    items.push({ id: nid(), title: a.title, cat: a.cat, note: a.note, done: false })
+    // duur mee in de notitie, zodat je bij het inplannen ziet hoeveel tijd het kost
+    items.push({ id: nid(), title: a.title, cat: a.cat, note: a.dur ? a.dur + ' · ' + a.note : a.note, done: false })
     const next = days.slice()
     next[activeDay] = { ...next[activeDay], items }
     commit(next)
@@ -163,27 +153,6 @@ export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () =
     }
   }
 
-  // ---- quiz ----
-  const qSetIdx = quizSetIndex()
-  const qSet = QUIZ_SETS[qSetIdx]
-  const qItem = qSet[quizQ]
-  function answerQuiz(idx: number, correctIdx: number) {
-    if (quizChosen != null) return
-    setQuizChosen(idx)
-    if (idx === correctIdx) setQuizScore((s) => s + 1)
-  }
-  function nextQuiz() {
-    const n = quizQ + 1
-    if (n >= qSet.length) {
-      setQuizQ(0)
-      setQuizChosen(null)
-      setQuizScore(0)
-    } else {
-      setQuizQ(n)
-      setQuizChosen(null)
-    }
-  }
-
   useEffect(() => () => clearTimeout(toastT.current), [])
 
   const day = days[activeDay] || { items: [], wd: '', dm: '', title: '', theme: '' }
@@ -192,9 +161,9 @@ export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () =
 
   const navItems: { key: Tab; label: string; icon: string }[] = [
     { key: 'overview', label: 'Overzicht', icon: '🏠' },
-    { key: 'ideas', label: 'Ideeën', icon: '💡' },
     { key: 'wensen', label: 'Wensen', icon: '⭐' },
     { key: 'planning', label: 'Planning', icon: '📅' },
+    { key: 'quiz', label: 'Quiz', icon: '🧠' },
     { key: 'tips', label: 'Tips', icon: '🎒' },
     { key: 'docs', label: 'Docs', icon: '🎫' },
   ]
@@ -241,20 +210,9 @@ export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () =
               confirmAdd={confirmAdd}
             />
           )}
-          {tab === 'ideas' && <Ideas toast={toast} addActivity={addActivity} />}
           {tab === 'wensen' && <Wensen toast={toast} onAddActivity={addActivity} userName={auth.name} />}
-          {tab === 'tips' && (
-            <Tips
-              qItem={qItem}
-              qSet={qSet}
-              quizQ={quizQ}
-              quizChosen={quizChosen}
-              quizScore={quizScore}
-              answerQuiz={answerQuiz}
-              nextQuiz={nextQuiz}
-              favBtn={favBtn}
-            />
-          )}
+          {tab === 'quiz' && <Quiz />}
+          {tab === 'tips' && <Tips favBtn={favBtn} />}
           {tab === 'docs' && <Docs onLogout={onLogout} />}
         </div>
 
@@ -374,7 +332,12 @@ function Overview({ auth }: { auth: Auth }) {
 
           {weather && (
             <>
-              <div style={{ fontSize: 13, color: '#6b7580', marginBottom: 12 }}>{weather.current.label}</div>
+              <div style={{ fontSize: 13, color: '#6b7580', marginBottom: 12 }}>
+                {weather.current.label} ·{' '}
+                <a href="https://open-meteo.com/" target="_blank" rel="noreferrer" style={{ fontWeight: 600 }}>
+                  bron: Open-Meteo
+                </a>
+              </div>
               <div className="chiprow" style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
                 {weather.daily.map((d) => (
                   <div
@@ -430,7 +393,11 @@ function Overview({ auth }: { auth: Auth }) {
             <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#b5674a' }} />
             <div style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 600, fontSize: 15 }}>Verblijf</div>
           </div>
-          <div style={{ fontSize: 16, fontWeight: 600 }}>JAM Hotel Lissabon</div>
+          <div style={{ fontSize: 16, fontWeight: 600 }}>
+            <a href={HOTEL_URL} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
+              JAM Hotel Lissabon ↗
+            </a>
+          </div>
           <div style={{ fontSize: 13, color: '#6b7580', marginTop: 4 }}>Check-in do 23 juli · check-out do 30 juli</div>
         </Card>
 
@@ -756,76 +723,8 @@ function Planning(props: {
   )
 }
 
-/* ===================== IDEEËN ===================== */
-function Ideas({ toast, addActivity }: { toast: string; addActivity: (a: Activity) => void }) {
-  return (
-    <div>
-      <div style={{ padding: '52px 20px 10px 20px' }}>
-        <div style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 700, fontSize: 26, letterSpacing: '-.5px' }}>
-          Leuke dingen om te doen
-        </div>
-        <div style={{ width: 36, height: 3, background: '#5e8c61', borderRadius: 2, marginTop: 8, marginBottom: 8 }} />
-        <div style={{ fontSize: 13, color: '#6b7580' }}>Afstand vanaf JAM Hotel. Voeg toe aan de dag die nu geselecteerd is in Planning.</div>
-      </div>
-      {toast && (
-        <div style={{ margin: '0 20px 10px', background: '#274b6b', color: '#f4efe6', fontSize: 13, fontWeight: 600, padding: '9px 14px', borderRadius: 10 }}>
-          {toast}
-        </div>
-      )}
-      <div style={{ padding: '0 16px 24px', display: 'flex', flexDirection: 'column', gap: 9 }}>
-        {ACTIVITIES.map((a, i) => {
-          const c = CATS[a.cat] || CATS.cultuur
-          return (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', borderRadius: 14, padding: '12px 12px', boxShadow: '0 1px 2px rgba(31,42,48,.05)' }}>
-              <span style={{ flex: '0 0 auto', width: 10, height: 10, borderRadius: '50%', background: c.color }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 11.5, fontWeight: 600, color: '#6b7580', textTransform: 'uppercase', letterSpacing: 0.3 }}>
-                  {c.label} · {a.dist} v.a. hotel
-                </div>
-                <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.25, marginTop: 1 }}>{a.title}</div>
-                <div style={{ fontSize: 12.5, color: '#333', marginTop: 4, lineHeight: 1.4 }}>{a.note}</div>
-                <div style={{ fontSize: 12, color: '#a17a4a', marginTop: 5, fontWeight: 600 }}>Wanneer: {a.when}</div>
-              </div>
-              <button
-                onClick={() => addActivity(a)}
-                style={{
-                  flex: '0 0 auto',
-                  alignSelf: 'flex-start',
-                  border: 'none',
-                  background: '#f0ece2',
-                  color: '#274b6b',
-                  fontWeight: 700,
-                  fontSize: 13,
-                  padding: '9px 13px',
-                  borderRadius: 10,
-                  cursor: 'pointer',
-                }}
-              >
-                + Voeg toe
-              </button>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
 /* ===================== TIPS ===================== */
-function Tips(props: {
-  qItem: { q: string; o: string[]; c: number }
-  qSet: { q: string; o: string[]; c: number }[]
-  quizQ: number
-  quizChosen: number | null
-  quizScore: number
-  answerQuiz: (idx: number, correctIdx: number) => void
-  nextQuiz: () => void
-  favBtn: (k: string) => { on: boolean; toggle: () => void; color: string }
-}) {
-  const { qItem, qSet, quizQ, quizChosen, quizScore } = props
-  const chosen = quizChosen
-  const feedback = chosen == null ? '' : chosen === qItem.c ? 'Goed zo! ✓' : 'Helaas — het juiste antwoord staat groen.'
-
+function Tips(props: { favBtn: (k: string) => { on: boolean; toggle: () => void; color: string } }) {
   return (
     <div>
       <div style={{ padding: '52px 20px 10px 20px' }}>
@@ -834,55 +733,6 @@ function Tips(props: {
         <div style={{ fontSize: 13, color: '#6b7580' }}>Handig voor een gezin met kinderen (9–12) met het openbaar vervoer.</div>
       </div>
       <div style={{ padding: '8px 20px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {/* Quiz */}
-        <div style={{ background: '#274b6b', borderRadius: 16, padding: 18, color: '#f4efe6' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
-            <div style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 600, fontSize: 16 }}>Lissabon-quiz van de dag</div>
-            <span style={{ fontSize: 12, fontWeight: 600, background: 'rgba(255,255,255,.18)', padding: '4px 9px', borderRadius: 999 }}>
-              Vraag {quizQ + 1}/{qSet.length}
-            </span>
-          </div>
-          <div style={{ fontSize: 15, fontWeight: 600, margin: '12px 0 10px', lineHeight: 1.35 }}>{qItem.q}</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {qItem.o.map((label, i) => {
-              let bg = '#f0ece2'
-              let col = '#1f2a30'
-              if (chosen != null) {
-                if (i === qItem.c) {
-                  bg = '#5e8c61'
-                  col = '#fff'
-                } else if (i === chosen) {
-                  bg = '#c15b4a'
-                  col = '#fff'
-                }
-              }
-              return (
-                <button
-                  key={i}
-                  onClick={() => props.answerQuiz(i, qItem.c)}
-                  style={{ textAlign: 'left', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600, padding: '11px 13px', borderRadius: 11, background: bg, color: col }}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, minHeight: 20 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#f6d9a8' }}>{feedback}</span>
-            <span style={{ fontSize: 12, color: 'rgba(244,239,230,.7)' }}>
-              Score: {quizScore}/{qSet.length}
-            </span>
-          </div>
-          {chosen != null && (
-            <button
-              onClick={props.nextQuiz}
-              style={{ width: '100%', marginTop: 10, border: 'none', cursor: 'pointer', background: '#e0a83e', color: '#274b6b', fontWeight: 700, fontSize: 14, padding: 11, borderRadius: 11 }}
-            >
-              {quizQ + 1 >= qSet.length ? 'Opnieuw beginnen' : 'Volgende vraag'}
-            </button>
-          )}
-        </div>
-
         <TipCard dot="#3d7ea6" title="Vervoer" fav={props.favBtn('vervoer')}>
           <li>
             Koop een <b>Navegante-kaart</b> (€0,50) en laad hem op — tikken is goedkoper dan losse kaartjes.

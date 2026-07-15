@@ -291,6 +291,21 @@ function Deck(props: {
           >
             {c.label} · {a.dist}
           </span>
+          <span
+            style={{
+              position: 'absolute',
+              top: 12,
+              right: 12,
+              fontSize: 11.5,
+              fontWeight: 700,
+              color: '#fff',
+              background: 'rgba(0,0,0,.22)',
+              padding: '5px 10px',
+              borderRadius: 999,
+            }}
+          >
+            ⏱ {a.dur}
+          </span>
         </div>
 
         <div style={{ padding: '18px 18px 20px' }}>
@@ -298,7 +313,9 @@ function Deck(props: {
             {a.title}
           </div>
           <div style={{ fontSize: 13.5, color: '#333', marginTop: 8, lineHeight: 1.45 }}>{a.note}</div>
-          <div style={{ fontSize: 12.5, color: '#a17a4a', marginTop: 10, fontWeight: 600 }}>Wanneer: {a.when}</div>
+          <div style={{ fontSize: 12.5, color: '#a17a4a', marginTop: 10, fontWeight: 600 }}>
+            Wanneer: {a.when} · Duur: {a.dur}
+          </div>
 
           {others.length > 0 && (
             <div style={{ marginTop: 12, background: '#f6f2ea', borderRadius: 10, padding: '9px 12px', display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -409,7 +426,7 @@ function Results(props: {
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 11.5, fontWeight: 600, color: '#6b7580', textTransform: 'uppercase', letterSpacing: 0.3 }}>
-                    {c.label} · {a.dist}
+                    {c.label} · {a.dist} · ⏱ {a.dur}
                   </div>
                   <div style={{ fontSize: 14.5, fontWeight: 600, lineHeight: 1.25 }}>{a.title}</div>
                 </div>
@@ -485,7 +502,7 @@ function Results(props: {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 11.5, fontWeight: 600, color: '#6b7580', textTransform: 'uppercase', letterSpacing: 0.3 }}>
-                        {c.label} · {a.dist}
+                        {c.label} · {a.dist} · ⏱ {a.dur}
                       </div>
                       <div style={{ fontSize: 14.5, fontWeight: 600, lineHeight: 1.25 }}>{a.title}</div>
                     </div>

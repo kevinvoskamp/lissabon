@@ -7,13 +7,15 @@ Geïmplementeerd vanuit het Claude Design-prototype (`Lissabon App.dc.html`) in 
 
 - **Inloggen** — wachtwoord is `vakantie`. De naam is vrij in te vullen (standaard "Familie Voskamp").
   De sessie blijft bewaard in `localStorage`; via **Docs → Uitloggen** log je weer uit.
-- **Overzicht** — reisgegevens, vluchten (Transavia HV5243/HV5244), verblijf, vaste dagtrips,
-  aftel-teller én **live weer** voor Lissabon (7-daagse verwachting).
-- **Ideeën** — 14 activiteiten met afstand vanaf het hotel; met één tik toe te voegen aan de
-  geselecteerde dag in Planning.
-- **Planning** — 8 dagen met slepen/omhoog-omlaag om de volgorde te wijzigen, afvinken,
-  verwijderen en eigen activiteiten toevoegen. Wordt bewaard in `localStorage`.
-- **Tips** — praktische tips per thema (favorieten met ★) en een dagelijkse Lissabon-quiz.
+- **Overzicht** — reisgegevens, vluchten (Transavia HV5243/HV5244), verblijf (met link naar het
+  hotel), vaste dagtrips, aftel-teller én **live weer** voor Lissabon (7-daagse verwachting, met bronlink).
+- **Wensen** — Tinder-achtig kaartendeck: per uitje een plaatje, uitleg, afstand én tijdsduur.
+  Iedereen logt onder eigen naam in en geeft 1–5 sterren; de ranglijst toont de sterren van
+  het hele gezin plus het gemiddelde, en van daaruit plan je uitjes in.
+- **Planning** — 8 dagen (bewust grotendeels leeg; alleen vluchten, hotel en dagtrips staan vast)
+  met slepen/omhoog-omlaag, afvinken, verwijderen en eigen activiteiten toevoegen.
+- **Quiz** — dagelijkse Lissabon-quiz met vijf vragen, eigen tabblad.
+- **Tips** — praktische tips per thema (favorieten met ★).
 - **Docs** — vlucht- en passagiersgegevens en contact.
 
 ## Weer
