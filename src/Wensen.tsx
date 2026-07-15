@@ -1,30 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { ACTIVITIES, CATS, type Activity } from './data'
-
-const KEY = 'lissabon-wensen-v2'
+import { useRatings, type AllRatings } from './ratings'
 
 // Sfeer-plaatje per activiteit (zelfde volgorde als ACTIVITIES)
 const ACTIVITY_EMOJI = ['🏛️', '🍽️', '🌅', '🚋', '🏰', '🌳', '🎨', '⛪', '🐠', '🔬', '🛺', '🧚', '🏖️', '🌊']
-
-// { [naam]: { [activiteit-titel]: sterren } }
-type AllRatings = Record<string, Record<string, number>>
-
-function loadAll(): AllRatings {
-  try {
-    const s = localStorage.getItem(KEY)
-    if (s) return JSON.parse(s)
-  } catch {
-    /* ignore */
-  }
-  return {}
-}
-function saveAll(r: AllRatings) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(r))
-  } catch {
-    /* ignore */
-  }
-}
 
 // tint the category color into a soft banner gradient
 function banner(color: string) {
@@ -40,29 +19,33 @@ export default function Wensen({
   onAddActivity: (a: Activity) => void
   userName: string
 }) {
-  const [all, setAll] = useState<AllRatings>(loadAll)
+  const { all, setRating: setRatingRemote, resetPerson, synced, shared } = useRatings()
   const mine = all[userName] || {}
-  const [queue, setQueue] = useState<number[]>(() => {
-    const m = loadAll()[userName] || {}
-    return ACTIVITIES.map((_, i) => i).filter((i) => m[ACTIVITIES[i].title] == null)
-  })
+  const [queue, setQueue] = useState<number[]>(() =>
+    ACTIVITIES.map((_, i) => i).filter((i) => mine[ACTIVITIES[i].title] == null),
+  )
   const [forceResults, setForceResults] = useState(false)
   const [exit, setExit] = useState<null | 'up' | 'left'>(null)
   const [hoverStar, setHoverStar] = useState(0)
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const reconciled = useRef(false)
 
   useEffect(() => () => clearTimeout(timer.current), [])
+
+  // Zodra de gedeelde data binnen is: kaarten die ik elders al beoordeelde uit de stapel halen (eenmalig)
+  useEffect(() => {
+    if (!synced || reconciled.current) return
+    reconciled.current = true
+    setQueue((q) => q.filter((i) => mine[ACTIVITIES[i].title] == null))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [synced])
 
   const ratedCount = Object.keys(mine).length
   const total = ACTIVITIES.length
   const showResults = forceResults || queue.length === 0
 
-  function persist(next: AllRatings) {
-    saveAll(next)
-    setAll(next)
-  }
   function setRating(title: string, stars: number) {
-    persist({ ...all, [userName]: { ...(all[userName] || {}), [title]: stars } })
+    setRatingRemote(userName, title, stars)
   }
 
   function rate(stars: number) {
@@ -88,9 +71,7 @@ export default function Wensen({
     }, 240)
   }
   function resetMine() {
-    const next = { ...all }
-    delete next[userName]
-    persist(next)
+    resetPerson(userName)
     setQueue(ACTIVITIES.map((_, i) => i))
     setForceResults(false)
     setHoverStar(0)
@@ -114,6 +95,12 @@ export default function Wensen({
         <div style={{ fontSize: 13, color: '#6b7580' }}>
           Je beoordeelt als <b style={{ color: '#1f2a30' }}>{userName}</b>. Geef elk idee 1 tot 5 sterren — in de ranglijst zie je de sterren
           van iedereen.
+        </div>
+        <div style={{ fontSize: 11.5, color: '#a59c8c', marginTop: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span
+            style={{ width: 7, height: 7, borderRadius: '50%', background: shared ? (synced ? '#5e8c61' : '#e0a83e') : '#c2b8a6' }}
+          />
+          {shared ? (synced ? 'Gedeeld met het gezin — synchroniseert live' : 'Verbinden met de gedeelde lijst…') : 'Alleen op dit apparaat opgeslagen'}
         </div>
       </div>
 
