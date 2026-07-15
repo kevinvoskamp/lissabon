@@ -380,12 +380,12 @@ function Results(props: {
     const rs = Object.keys(all)
       .filter((n) => all[n] && all[n][a.title] != null)
       .map((n) => ({ name: n, stars: all[n][a.title] }))
-    const avg = rs.length ? rs.reduce((s, r) => s + r.stars, 0) / rs.length : null
-    return { a, i, rs, avg }
+    const total = rs.reduce((s, r) => s + r.stars, 0)
+    return { a, i, rs, total }
   })
   const rated = info
     .filter((x) => x.rs.length > 0)
-    .sort((x, y) => (y.avg as number) - (x.avg as number) || y.rs.length - x.rs.length || x.i - y.i)
+    .sort((x, y) => y.total - x.total || y.rs.length - x.rs.length || x.i - y.i)
   const unrated = info.filter((x) => x.rs.length === 0)
 
   return (
@@ -393,7 +393,7 @@ function Results(props: {
       <div style={{ background: '#274b6b', borderRadius: 16, padding: '16px 18px', color: '#f4efe6', marginBottom: 14 }}>
         <div style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 700, fontSize: 18 }}>Jullie ranglijst</div>
         <div style={{ fontSize: 13, color: 'rgba(244,239,230,.85)', marginTop: 4 }}>
-          Gesorteerd op het gemiddelde van iedereen. Per uitje zie je wie hoeveel sterren gaf — tik op je eigen sterren om bij te stellen.
+          Gesorteerd op het totaal van alle sterren bij elkaar opgeteld. Per uitje zie je wie hoeveel sterren gaf — tik op je eigen sterren om bij te stellen.
         </div>
       </div>
 
@@ -402,7 +402,7 @@ function Results(props: {
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-        {rated.map(({ a, i, rs, avg }) => {
+        {rated.map(({ a, i, rs, total }) => {
           const c = CATS[a.cat] || CATS.cultuur
           const myStars = all[userName] ? all[userName][a.title] : undefined
           const others = rs.filter((r) => r.name !== userName)
@@ -433,17 +433,21 @@ function Results(props: {
                 <span
                   style={{
                     flex: '0 0 auto',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
                     fontFamily: "'Bricolage Grotesque',sans-serif",
-                    fontWeight: 700,
-                    fontSize: 13,
                     color: '#274b6b',
                     background: '#e9f0f4',
-                    padding: '5px 9px',
-                    borderRadius: 999,
+                    padding: '5px 10px',
+                    borderRadius: 12,
                   }}
-                  title={'Gemiddelde van ' + rs.length + (rs.length === 1 ? ' persoon' : ' personen')}
+                  title={'Totaal van ' + rs.length + (rs.length === 1 ? ' persoon' : ' personen')}
                 >
-                  Ø {(avg as number).toFixed(1).replace('.', ',')}
+                  <span style={{ fontWeight: 700, fontSize: 16, lineHeight: 1 }}>★ {total}</span>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: '#6b8199' }}>
+                    {rs.length} {rs.length === 1 ? 'pers.' : 'pers.'}
+                  </span>
                 </span>
               </div>
 
