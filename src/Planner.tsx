@@ -4,7 +4,7 @@ import { useWeather } from './useWeather'
 import Wensen from './Wensen'
 import type { Auth } from './Login'
 
-const KEY = 'lissabon-planner-v2'
+const KEY = 'lissabon-planner-v3'
 const FAV_KEY = 'lissabon-tips-favs'
 
 type Tab = 'overview' | 'ideas' | 'wensen' | 'planning' | 'tips' | 'docs'
@@ -190,13 +190,13 @@ export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () =
   const accent = '#274b6b'
   const muted = '#a49b8b'
 
-  const navItems: { key: Tab; label: string }[] = [
-    { key: 'overview', label: 'Overzicht' },
-    { key: 'ideas', label: 'Ideeën' },
-    { key: 'wensen', label: 'Wensen' },
-    { key: 'planning', label: 'Planning' },
-    { key: 'tips', label: 'Tips' },
-    { key: 'docs', label: 'Docs' },
+  const navItems: { key: Tab; label: string; icon: string }[] = [
+    { key: 'overview', label: 'Overzicht', icon: '🏠' },
+    { key: 'ideas', label: 'Ideeën', icon: '💡' },
+    { key: 'wensen', label: 'Wensen', icon: '⭐' },
+    { key: 'planning', label: 'Planning', icon: '📅' },
+    { key: 'tips', label: 'Tips', icon: '🎒' },
+    { key: 'docs', label: 'Docs', icon: '🎫' },
   ]
 
   return (
@@ -242,7 +242,7 @@ export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () =
             />
           )}
           {tab === 'ideas' && <Ideas toast={toast} addActivity={addActivity} />}
-          {tab === 'wensen' && <Wensen toast={toast} onAddActivity={addActivity} />}
+          {tab === 'wensen' && <Wensen toast={toast} onAddActivity={addActivity} userName={auth.name} />}
           {tab === 'tips' && (
             <Tips
               qItem={qItem}
@@ -292,7 +292,17 @@ export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () =
                   paddingTop: 12,
                 }}
               >
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: on ? accent : 'transparent' }} />
+                <span
+                  style={{
+                    fontSize: 19,
+                    lineHeight: 1,
+                    filter: on ? 'none' : 'grayscale(1) opacity(.45)',
+                    transform: on ? 'scale(1.08)' : 'none',
+                    transition: 'filter .15s, transform .15s',
+                  }}
+                >
+                  {n.icon}
+                </span>
                 <span style={{ fontSize: 11, fontWeight: 600, color: on ? accent : muted }}>{n.label}</span>
               </button>
             )

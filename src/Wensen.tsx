@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { ACTIVITIES, CATS, type Activity } from './data'
 
-const KEY = 'lissabon-wensen-v1'
+const KEY = 'lissabon-wensen-v2'
 
 // Sfeer-plaatje per activiteit (zelfde volgorde als ACTIVITIES)
 const ACTIVITY_EMOJI = ['🏛️', '🍽️', '🌅', '🚋', '🏰', '🌳', '🎨', '⛪', '🐠', '🔬', '🛺', '🧚', '🏖️', '🌊']
 
-type Ratings = Record<string, number>
+// { [naam]: { [activiteit-titel]: sterren } }
+type AllRatings = Record<string, Record<string, number>>
 
-function loadRatings(): Ratings {
+function loadAll(): AllRatings {
   try {
     const s = localStorage.getItem(KEY)
     if (s) return JSON.parse(s)
@@ -17,7 +18,7 @@ function loadRatings(): Ratings {
   }
   return {}
 }
-function saveRatings(r: Ratings) {
+function saveAll(r: AllRatings) {
   try {
     localStorage.setItem(KEY, JSON.stringify(r))
   } catch {
@@ -30,11 +31,21 @@ function banner(color: string) {
   return `linear-gradient(135deg, ${color} 0%, ${color}cc 55%, ${color}99 100%)`
 }
 
-export default function Wensen({ toast, onAddActivity }: { toast: string; onAddActivity: (a: Activity) => void }) {
-  const [ratings, setRatings] = useState<Ratings>(loadRatings)
-  const [queue, setQueue] = useState<number[]>(() =>
-    ACTIVITIES.map((_, i) => i).filter((i) => ratings[ACTIVITIES[i].title] == null),
-  )
+export default function Wensen({
+  toast,
+  onAddActivity,
+  userName,
+}: {
+  toast: string
+  onAddActivity: (a: Activity) => void
+  userName: string
+}) {
+  const [all, setAll] = useState<AllRatings>(loadAll)
+  const mine = all[userName] || {}
+  const [queue, setQueue] = useState<number[]>(() => {
+    const m = loadAll()[userName] || {}
+    return ACTIVITIES.map((_, i) => i).filter((i) => m[ACTIVITIES[i].title] == null)
+  })
   const [forceResults, setForceResults] = useState(false)
   const [exit, setExit] = useState<null | 'up' | 'left'>(null)
   const [hoverStar, setHoverStar] = useState(0)
@@ -42,13 +53,16 @@ export default function Wensen({ toast, onAddActivity }: { toast: string; onAddA
 
   useEffect(() => () => clearTimeout(timer.current), [])
 
-  const ratedCount = Object.keys(ratings).length
+  const ratedCount = Object.keys(mine).length
   const total = ACTIVITIES.length
   const showResults = forceResults || queue.length === 0
 
-  function persist(next: Ratings) {
-    saveRatings(next)
-    setRatings(next)
+  function persist(next: AllRatings) {
+    saveAll(next)
+    setAll(next)
+  }
+  function setRating(title: string, stars: number) {
+    persist({ ...all, [userName]: { ...(all[userName] || {}), [title]: stars } })
   }
 
   function rate(stars: number) {
@@ -57,7 +71,7 @@ export default function Wensen({ toast, onAddActivity }: { toast: string; onAddA
     setExit('up')
     clearTimeout(timer.current)
     timer.current = setTimeout(() => {
-      persist({ ...ratings, [ACTIVITIES[idx].title]: stars })
+      setRating(ACTIVITIES[idx].title, stars)
       setQueue((q) => q.slice(1))
       setExit(null)
       setHoverStar(0)
@@ -73,12 +87,10 @@ export default function Wensen({ toast, onAddActivity }: { toast: string; onAddA
       setHoverStar(0)
     }, 240)
   }
-  function setRating(title: string, stars: number) {
-    persist({ ...ratings, [title]: stars })
-  }
-  function resetAll() {
-    saveRatings({})
-    setRatings({})
+  function resetMine() {
+    const next = { ...all }
+    delete next[userName]
+    persist(next)
     setQueue(ACTIVITIES.map((_, i) => i))
     setForceResults(false)
     setHoverStar(0)
@@ -100,7 +112,8 @@ export default function Wensen({ toast, onAddActivity }: { toast: string; onAddA
         </div>
         <div style={{ width: 36, height: 3, background: '#c99a3f', borderRadius: 2, marginTop: 8, marginBottom: 8 }} />
         <div style={{ fontSize: 13, color: '#6b7580' }}>
-          Geef elk idee 1 tot 5 sterren. Zo zien we samen wat het beste past. Na je beoordeling verschijnt vanzelf het volgende.
+          Je beoordeelt als <b style={{ color: '#1f2a30' }}>{userName}</b>. Geef elk idee 1 tot 5 sterren — in de ranglijst zie je de sterren
+          van iedereen.
         </div>
       </div>
 
@@ -112,9 +125,10 @@ export default function Wensen({ toast, onAddActivity }: { toast: string; onAddA
 
       {showResults ? (
         <Results
-          ratings={ratings}
+          all={all}
+          userName={userName}
           setRating={setRating}
-          resetAll={resetAll}
+          resetMine={resetMine}
           onAddActivity={onAddActivity}
           remaining={queue.length}
           backToDeck={queue.length > 0 ? () => setForceResults(false) : undefined}
@@ -122,6 +136,8 @@ export default function Wensen({ toast, onAddActivity }: { toast: string; onAddA
       ) : (
         <Deck
           idx={queue[0]}
+          all={all}
+          userName={userName}
           exit={exit}
           hoverStar={hoverStar}
           setHoverStar={setHoverStar}
@@ -179,8 +195,30 @@ function Stars({
   )
 }
 
+// Kleine, niet-klikbare sterrenrij voor andermans beoordeling
+function StaticStars({ value, size = 14 }: { value: number; size?: number }) {
+  return (
+    <span style={{ display: 'inline-flex', gap: 1 }}>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <span key={n} style={{ fontSize: size, lineHeight: 1, color: n <= value ? '#e0a83e' : '#dcd4c4' }}>
+          ★
+        </span>
+      ))}
+    </span>
+  )
+}
+
+// alle beoordelingen van anderen voor één activiteit
+function othersFor(all: AllRatings, userName: string, title: string) {
+  return Object.keys(all)
+    .filter((n) => n !== userName && all[n] && all[n][title] != null)
+    .map((n) => ({ name: n, stars: all[n][title] }))
+}
+
 function Deck(props: {
   idx: number
+  all: AllRatings
+  userName: string
   exit: null | 'up' | 'left'
   hoverStar: number
   setHoverStar: (n: number) => void
@@ -193,6 +231,7 @@ function Deck(props: {
   const a = ACTIVITIES[props.idx]
   const c = CATS[a.cat] || CATS.cultuur
   const emoji = ACTIVITY_EMOJI[props.idx] || '📍'
+  const others = othersFor(props.all, props.userName, a.title)
 
   const exitStyle: React.CSSProperties =
     props.exit === 'up'
@@ -261,6 +300,17 @@ function Deck(props: {
           <div style={{ fontSize: 13.5, color: '#333', marginTop: 8, lineHeight: 1.45 }}>{a.note}</div>
           <div style={{ fontSize: 12.5, color: '#a17a4a', marginTop: 10, fontWeight: 600 }}>Wanneer: {a.when}</div>
 
+          {others.length > 0 && (
+            <div style={{ marginTop: 12, background: '#f6f2ea', borderRadius: 10, padding: '9px 12px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {others.map((o) => (
+                <div key={o.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 600, color: '#6b7580' }}>{o.name}</span>
+                  <StaticStars value={o.stars} />
+                </div>
+              ))}
+            </div>
+          )}
+
           <div style={{ height: 1, background: '#f0ece2', margin: '16px 0 14px' }} />
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
@@ -299,24 +349,34 @@ const RATING_LABEL: Record<number, string> = {
 }
 
 function Results(props: {
-  ratings: Ratings
+  all: AllRatings
+  userName: string
   setRating: (title: string, n: number) => void
-  resetAll: () => void
+  resetMine: () => void
   onAddActivity: (a: Activity) => void
   remaining: number
   backToDeck?: () => void
 }) {
-  const rated = ACTIVITIES.map((a, i) => ({ a, i }))
-    .filter(({ a }) => props.ratings[a.title] != null)
-    .sort((x, y) => props.ratings[y.a.title] - props.ratings[x.a.title] || x.i - y.i)
-  const unrated = ACTIVITIES.map((a, i) => ({ a, i })).filter(({ a }) => props.ratings[a.title] == null)
+  const { all, userName } = props
+
+  const info = ACTIVITIES.map((a, i) => {
+    const rs = Object.keys(all)
+      .filter((n) => all[n] && all[n][a.title] != null)
+      .map((n) => ({ name: n, stars: all[n][a.title] }))
+    const avg = rs.length ? rs.reduce((s, r) => s + r.stars, 0) / rs.length : null
+    return { a, i, rs, avg }
+  })
+  const rated = info
+    .filter((x) => x.rs.length > 0)
+    .sort((x, y) => (y.avg as number) - (x.avg as number) || y.rs.length - x.rs.length || x.i - y.i)
+  const unrated = info.filter((x) => x.rs.length === 0)
 
   return (
     <div style={{ padding: '0 20px 24px' }}>
       <div style={{ background: '#274b6b', borderRadius: 16, padding: '16px 18px', color: '#f4efe6', marginBottom: 14 }}>
         <div style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 700, fontSize: 18 }}>Jullie ranglijst</div>
         <div style={{ fontSize: 13, color: 'rgba(244,239,230,.85)', marginTop: 4 }}>
-          Gesorteerd op sterren — bovenaan staat wat het beste past. Tik op de sterren om bij te stellen.
+          Gesorteerd op het gemiddelde van iedereen. Per uitje zie je wie hoeveel sterren gaf — tik op je eigen sterren om bij te stellen.
         </div>
       </div>
 
@@ -325,8 +385,10 @@ function Results(props: {
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-        {rated.map(({ a, i }) => {
+        {rated.map(({ a, i, rs, avg }) => {
           const c = CATS[a.cat] || CATS.cultuur
+          const myStars = all[userName] ? all[userName][a.title] : undefined
+          const others = rs.filter((r) => r.name !== userName)
           return (
             <div key={a.title} style={{ background: '#fff', borderRadius: 14, padding: 12, boxShadow: '0 1px 2px rgba(31,42,48,.05)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
@@ -351,12 +413,41 @@ function Results(props: {
                   </div>
                   <div style={{ fontSize: 14.5, fontWeight: 600, lineHeight: 1.25 }}>{a.title}</div>
                 </div>
+                <span
+                  style={{
+                    flex: '0 0 auto',
+                    fontFamily: "'Bricolage Grotesque',sans-serif",
+                    fontWeight: 700,
+                    fontSize: 13,
+                    color: '#274b6b',
+                    background: '#e9f0f4',
+                    padding: '5px 9px',
+                    borderRadius: 999,
+                  }}
+                  title={'Gemiddelde van ' + rs.length + (rs.length === 1 ? ' persoon' : ' personen')}
+                >
+                  Ø {(avg as number).toFixed(1).replace('.', ',')}
+                </span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, gap: 8 }}>
-                <Stars value={props.ratings[a.title]} onPick={(n) => props.setRating(a.title, n)} size={22} />
+
+              {/* sterren per persoon */}
+              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: '#1f2a30' }}>{userName} (jij)</span>
+                  <Stars value={myStars || 0} onPick={(n) => props.setRating(a.title, n)} size={19} />
+                </div>
+                {others.map((o) => (
+                  <div key={o.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <span style={{ fontSize: 12.5, fontWeight: 600, color: '#6b7580' }}>{o.name}</span>
+                    <StaticStars value={o.stars} size={17} />
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
                 <button
                   onClick={() => props.onAddActivity(a)}
-                  style={{ border: 'none', background: '#f0ece2', color: '#274b6b', fontWeight: 700, fontSize: 12.5, padding: '8px 11px', borderRadius: 10, cursor: 'pointer', flex: '0 0 auto' }}
+                  style={{ border: 'none', background: '#f0ece2', color: '#274b6b', fontWeight: 700, fontSize: 12.5, padding: '8px 11px', borderRadius: 10, cursor: 'pointer' }}
                 >
                   + In planning
                 </button>
@@ -369,7 +460,7 @@ function Results(props: {
       {unrated.length > 0 && (
         <>
           <div style={{ fontSize: 12.5, fontWeight: 600, color: '#a59c8c', textTransform: 'uppercase', letterSpacing: 0.4, margin: '20px 0 8px' }}>
-            Nog niet beoordeeld
+            Nog door niemand beoordeeld
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
             {unrated.map(({ a, i }) => {
@@ -419,10 +510,10 @@ function Results(props: {
           </button>
         )}
         <button
-          onClick={props.resetAll}
+          onClick={props.resetMine}
           style={{ flex: 1, border: '1.5px solid #e4dccd', background: 'transparent', color: '#6b7580', fontWeight: 600, fontSize: 14, padding: 13, borderRadius: 12, cursor: 'pointer' }}
         >
-          Opnieuw beginnen
+          Mijn sterren wissen
         </button>
       </div>
     </div>

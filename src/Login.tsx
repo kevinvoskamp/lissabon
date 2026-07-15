@@ -4,6 +4,8 @@ export const AUTH_KEY = 'lissabon-auth'
 // The one account for this app. Wachtwoord is altijd "vakantie".
 const PASSWORD = 'vakantie'
 const DEFAULT_NAME = 'Familie Voskamp'
+// Snelkeuze — iedereen logt in onder z'n eigen naam, zodat sterren per persoon worden bewaard
+const FAMILY = ['Kevin', 'Danielle', 'Maura', 'Lieke']
 
 export interface Auth {
   name: string
@@ -104,6 +106,30 @@ export default function Login({ onLogin }: { onLogin: (auth: Auth) => void }) {
             <span style={{ fontSize: 12.5, fontWeight: 600, color: '#6b7580', textTransform: 'uppercase', letterSpacing: 0.4 }}>
               Naam
             </span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 2 }}>
+              {FAMILY.map((f) => {
+                const sel = name === f
+                return (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => setName(f)}
+                    style={{
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: 12.5,
+                      fontWeight: 600,
+                      padding: '7px 12px',
+                      borderRadius: 999,
+                      background: sel ? '#274b6b' : '#f0ece2',
+                      color: sel ? '#f4efe6' : '#6b7580',
+                    }}
+                  >
+                    {f}
+                  </button>
+                )
+              })}
+            </div>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}

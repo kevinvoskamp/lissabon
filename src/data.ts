@@ -32,6 +32,8 @@ function mk(title: string, cat: CatKey, note?: string): Item {
   return { id: nid(), title, cat: cat || 'cultuur', note: note || '', done: false }
 }
 
+// Bewust grotendeels leeg: alleen de vaste ankers (vluchten, hotel, dagtrips).
+// De rest vullen jullie zelf via Ideeën en Wensen.
 export function seed(): Day[] {
   return [
     {
@@ -42,88 +44,33 @@ export function seed(): Day[] {
       items: [
         mk('Vlucht HV5243 Rotterdam → Lissabon', 'praktisch', 'Transavia, vertrek 16:00, aankomst 17:55'),
         mk('Inchecken JAM Hotel', 'praktisch', 'Even settelen en bijkomen'),
-        mk('Avondeten in Baixa / Rua Augusta', 'eten', 'Autovrije straten, terrasjes'),
       ],
     },
-    {
-      wd: 'Vr',
-      dm: '24/7',
-      title: 'Vrijdag 24 juli',
-      theme: 'Alfama, tram 28 & kasteel',
-      items: [
-        mk('Ritje met tram 28 door Alfama', 'cultuur', 'Beroemde gele tram over de heuvels'),
-        mk('Castelo de São Jorge', 'uitzicht', 'Kasteelmuren, uitzicht en pauwen spotten'),
-        mk('Lunch in Alfama', 'eten', ''),
-        mk('Miradouro de Santa Luzia', 'uitzicht', 'Uitkijkpunt met azulejo-tegels'),
-      ],
-    },
-    {
-      wd: 'Za',
-      dm: '25/7',
-      title: 'Zaterdag 25 juli',
-      theme: 'Oceanário & Parque das Nações',
-      items: [
-        mk('Oceanário de Lisboa', 'strand', 'Een van de grootste aquariums van Europa — koop tickets online'),
-        mk('Lunch Parque das Nações', 'eten', ''),
-        mk('Kabelbaan (Telecabine) langs de Taag', 'natuur', 'Leuk uitzicht over het water'),
-      ],
-    },
+    { wd: 'Vr', dm: '24/7', title: 'Vrijdag 24 juli', theme: 'Nog in te vullen', items: [] },
+    { wd: 'Za', dm: '25/7', title: 'Zaterdag 25 juli', theme: 'Nog in te vullen', items: [] },
     {
       wd: 'Zo',
       dm: '26/7',
       title: 'Zondag 26 juli',
       theme: 'Dagtrip Sintra',
-      items: [
-        mk('Trein vanaf Rossio naar Sintra', 'praktisch', '~40 min, start vroeg tegen de drukte'),
-        mk('Palácio da Pena', 'cultuur', 'Kleurrijk sprookjespaleis — vooraf boeken. 434-bus vanaf station'),
-        mk('Lunch in centrum Sintra', 'eten', 'Proef een travesseiro'),
-        mk('Quinta da Regaleira', 'natuur', 'Tuinen, grotten en de spiraalvormige inwijdingsput'),
-      ],
+      items: [mk('Dagtrip Sintra', 'natuur', 'Trein vanaf Rossio (~40 min) — vertrek vroeg tegen de drukte')],
     },
-    {
-      wd: 'Ma',
-      dm: '27/7',
-      title: 'Maandag 27 juli',
-      theme: 'Belém aan de rivier',
-      items: [
-        mk('Pastéis de Belém', 'eten', 'Het originele custardtaartje'),
-        mk('Mosteiro dos Jerónimos', 'cultuur', ''),
-        mk('Torre de Belém', 'uitzicht', ''),
-        mk('Hippotrip amfibiebus (optioneel)', 'natuur', 'Over land én water — vooraf reserveren'),
-      ],
-    },
+    { wd: 'Ma', dm: '27/7', title: 'Maandag 27 juli', theme: 'Nog in te vullen', items: [] },
     {
       wd: 'Di',
       dm: '28/7',
       title: 'Dinsdag 28 juli',
       theme: 'Dagtrip Cascais',
-      items: [
-        mk('Trein Cais do Sodré → Cascais', 'praktisch', '35–40 min, ga links zitten voor kustuitzicht'),
-        mk('Strand & oude centrum Cascais', 'strand', 'Rustige stadsstranden, wandelbaar stadje'),
-        mk('Lunch met verse vis', 'eten', ''),
-        mk('Praia da Rainha / zwemmen', 'strand', ''),
-      ],
+      items: [mk('Dagtrip Cascais', 'strand', 'Directe trein vanaf Cais do Sodré (35–40 min)')],
     },
-    {
-      wd: 'Wo',
-      dm: '29/7',
-      title: 'Woensdag 29 juli',
-      theme: 'Wetenschap & LX Factory',
-      items: [
-        mk('Pavilhão do Conhecimento', 'cultuur', 'Doe-wetenschapsmuseum, familieticket ~€27'),
-        mk('Lunch & winkelen LX Factory', 'eten', 'Kindvriendelijke plek onder de brug'),
-        mk('Vrije middag / zwembad hotel', 'strand', ''),
-      ],
-    },
+    { wd: 'Wo', dm: '29/7', title: 'Woensdag 29 juli', theme: 'Nog in te vullen', items: [] },
     {
       wd: 'Do',
       dm: '30/7',
       title: 'Donderdag 30 juli',
       theme: 'Vertrek',
       items: [
-        mk('Laatste pastéis de nata', 'eten', ''),
         mk('Uitchecken JAM Hotel', 'praktisch', ''),
-        mk('Metro naar de luchthaven', 'praktisch', ''),
         mk('Terugvlucht HV5244 naar Rotterdam', 'praktisch', 'Transavia, vertrek 18:40, aankomst 22:30'),
       ],
     },
