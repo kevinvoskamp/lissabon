@@ -168,7 +168,7 @@ export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () =
   ]
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', background: '#d9d2c5' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', background: 'transparent' }}>
       <div
         style={{
           width: '100%',
@@ -288,7 +288,7 @@ function Overview({ auth }: { auth: Auth }) {
             marginBottom: 10,
           }}
         >
-          Familievakantie · Portugal
+          Familievakantie · Portugal<span className="flag-chip" />
         </div>
         <div style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 700, fontSize: 44, lineHeight: 0.95, letterSpacing: -1 }}>
           Lissabon

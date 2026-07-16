@@ -56,7 +56,7 @@ export default function Login({ onLogin }: { onLogin: (auth: Auth) => void }) {
         display: 'flex',
         alignItems: 'flex-start',
         justifyContent: 'center',
-        background: '#d9d2c5',
+        background: 'transparent',
       }}
     >
       <div
@@ -84,7 +84,7 @@ export default function Login({ onLogin }: { onLogin: (auth: Auth) => void }) {
               marginBottom: 10,
             }}
           >
-            Familievakantie · Portugal
+            Familievakantie · Portugal<span className="flag-chip" />
           </div>
           <div style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 700, fontSize: 44, lineHeight: 0.95, letterSpacing: -1 }}>
             Lissabon
