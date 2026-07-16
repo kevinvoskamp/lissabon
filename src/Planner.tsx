@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { CATS, seed, nid, type Activity, type CatKey, type Day } from './data'
+import { CATS, seed, nid, type Activity, type CatKey, type Day, type InfoRow } from './data'
 import { useWeather } from './useWeather'
+import { useSharedList, newId } from './sharedList'
 import Wensen from './Wensen'
 import Quiz from './Quiz'
 import type { Auth } from './Login'
 
 const KEY = 'lissabon-planner-v5'
 const FAV_KEY = 'lissabon-tips-favs'
+const SHORT_KEY = 'lissabon-shortlist-v1'
 const HOTEL_URL = 'https://www.jamhotels.eu/lisbon'
 
 type Tab = 'overview' | 'wensen' | 'planning' | 'quiz' | 'tips' | 'docs'
@@ -22,6 +24,25 @@ function loadDays(): Day[] {
     /* ignore */
   }
   return seed()
+}
+
+/** Wensen die je wilt inplannen, maar nog geen dag hebben. */
+export interface ShortItem {
+  id: string
+  title: string
+  cat: CatKey
+  dur: string
+  note: string
+}
+
+function loadShortlist(): ShortItem[] {
+  try {
+    const s = localStorage.getItem(SHORT_KEY)
+    if (s) return JSON.parse(s)
+  } catch {
+    /* ignore */
+  }
+  return []
 }
 
 function loadFavs(): Record<string, boolean> {
@@ -54,7 +75,7 @@ function countdownText(): string {
 export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () => void }) {
   const [tab, setTab] = useState<Tab>('overview')
   const [days, setDays] = useState<Day[]>(loadDays)
-  const [activeDay, setActiveDay] = useState(0)
+  const [shortlist, setShortlist] = useState<ShortItem[]>(loadShortlist)
   const [addForDay, setAddForDay] = useState<number | null>(null)
   const [draftTitle, setDraftTitle] = useState('')
   const [draftCat, setDraftCat] = useState<CatKey>('cultuur')
@@ -123,15 +144,35 @@ export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () =
     setDraftTitle('')
     setDraftCat('cultuur')
   }
-  function addActivity(a: Activity) {
-    const items = days[activeDay].items.slice()
+  // ---- shortlist: wensen die nog een dag moeten krijgen ----
+  function saveShort(next: ShortItem[]) {
+    try {
+      localStorage.setItem(SHORT_KEY, JSON.stringify(next))
+    } catch {
+      /* ignore */
+    }
+    setShortlist(next)
+  }
+  function toggleShort(a: Activity) {
+    const existing = shortlist.find((s) => s.title === a.title)
+    if (existing) {
+      saveShort(shortlist.filter((s) => s.title !== a.title))
+      showToast('Van de lijst gehaald')
+      return
+    }
+    saveShort([...shortlist, { id: nid(), title: a.title, cat: a.cat, dur: a.dur, note: a.note }])
+    showToast('Op de lijst — plan hem in bij Planning')
+  }
+  function planShort(item: ShortItem, dayIdx: number) {
+    const items = days[dayIdx].items.slice()
     // duur mee in de notitie, zodat je bij het inplannen ziet hoeveel tijd het kost
-    items.push({ id: nid(), title: a.title, cat: a.cat, note: a.dur ? a.dur + ' · ' + a.note : a.note, done: false })
+    items.push({ id: nid(), title: item.title, cat: item.cat, note: item.dur ? item.dur + ' · ' + item.note : item.note, done: false })
     const next = days.slice()
-    next[activeDay] = { ...next[activeDay], items }
+    next[dayIdx] = { ...next[dayIdx], items }
     commit(next)
-    const d = next[activeDay]
-    showToast('Toegevoegd aan ' + d.wd + ' ' + d.dm)
+    saveShort(shortlist.filter((s) => s.id !== item.id))
+    const d = next[dayIdx]
+    showToast('Ingepland op ' + d.wd + ' ' + d.dm)
   }
 
   // ---- favorites ----
@@ -164,7 +205,7 @@ export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () =
     { key: 'planning', label: 'Planning', icon: '📅' },
     { key: 'quiz', label: 'Quiz', icon: '🧠' },
     { key: 'tips', label: 'Tips', icon: '🎒' },
-    { key: 'docs', label: 'Docs', icon: '🎫' },
+    { key: 'docs', label: 'Gegevens', icon: '🎫' },
   ]
 
   return (
@@ -200,21 +241,22 @@ export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () =
               draftCat={draftCat}
               setDraftCat={setDraftCat}
               confirmAdd={confirmAdd}
+              shortlist={shortlist}
+              planShort={planShort}
+              dropShort={(id) => saveShort(shortlist.filter((s) => s.id !== id))}
             />
           )}
           {tab === 'wensen' && (
             <Wensen
               toast={toast}
-              onAddActivity={addActivity}
               userName={auth.name}
-              days={days}
-              activeDay={activeDay}
-              setActiveDay={setActiveDay}
+              shortTitles={shortlist.map((s) => s.title)}
+              onToggleShort={toggleShort}
             />
           )}
           {tab === 'quiz' && <Quiz userName={auth.name} />}
           {tab === 'tips' && <Tips favBtn={favBtn} />}
-          {tab === 'docs' && <Docs onLogout={onLogout} />}
+          {tab === 'docs' && <Docs onLogout={onLogout} userName={auth.name} />}
         </div>
 
         {/* bottom nav */}
@@ -475,8 +517,11 @@ function Planning(props: {
   draftCat: CatKey
   setDraftCat: (c: CatKey) => void
   confirmAdd: (dayIdx: number) => void
+  shortlist: ShortItem[]
+  planShort: (item: ShortItem, dayIdx: number) => void
+  dropShort: (id: string) => void
 }) {
-  const { days, toast, dragOver, setDragOver, dragIdx } = props
+  const { days, toast, dragOver, setDragOver, dragIdx, shortlist } = props
   const totalItems = days.reduce((s, d) => s + d.items.length, 0)
 
   const rowBase: React.CSSProperties = {
@@ -507,9 +552,71 @@ function Planning(props: {
         </div>
       )}
 
-      {totalItems === 0 && (
+      {totalItems === 0 && shortlist.length === 0 && (
         <div style={{ margin: '12px 20px 0', textAlign: 'center', color: '#a59c8c', fontSize: 13.5, lineHeight: 1.5 }}>
-          Nog niets gepland. Ga naar <b>Wensen</b>, geef sterren en zet favorieten hier neer.
+          Nog niets gepland. Ga naar <b>Wensen</b> en zet daar dingen op <b>In te plannen</b>.
+        </div>
+      )}
+
+      {/* Nog in te plannen: wel gekozen, nog geen dag */}
+      {shortlist.length > 0 && (
+        <div style={{ margin: '14px 16px 0', background: '#fdf4e3', border: '1.5px solid #f0dfba', borderRadius: 16, padding: 14 }}>
+          <div style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 700, fontSize: 15, marginBottom: 2 }}>
+            Nog in te plannen ({shortlist.length})
+          </div>
+          <div style={{ fontSize: 12.5, color: '#8a7b5e', marginBottom: 12 }}>Kies per idee op welke dag het moet.</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+            {shortlist.map((s) => {
+              const c = CATS[s.cat] || CATS.cultuur
+              return (
+                <div key={s.id} style={{ background: '#fff', borderRadius: 12, padding: 11, boxShadow: '0 1px 2px rgba(31,42,48,.05)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                    <span style={{ flex: '0 0 auto', width: 10, height: 10, borderRadius: '50%', background: c.color }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 11.5, fontWeight: 600, color: '#6b7580', textTransform: 'uppercase', letterSpacing: 0.3 }}>
+                        {c.label}
+                        {s.dur ? ' · ⏱ ' + s.dur : ''}
+                      </div>
+                      <div style={{ fontSize: 14.5, fontWeight: 600, lineHeight: 1.25 }}>{s.title}</div>
+                    </div>
+                    <button
+                      onClick={() => props.dropShort(s.id)}
+                      title="Van de lijst halen"
+                      style={{ border: 'none', background: 'transparent', color: '#c4a99a', width: 22, height: 22, borderRadius: 6, cursor: 'pointer', fontSize: 18, lineHeight: 1 }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <select
+                    defaultValue=""
+                    onChange={(e) => {
+                      if (e.target.value === '') return
+                      props.planShort(s, Number(e.target.value))
+                    }}
+                    style={{
+                      width: '100%',
+                      marginTop: 9,
+                      border: '1px solid #e4dccd',
+                      borderRadius: 9,
+                      padding: '9px 10px',
+                      fontSize: 13.5,
+                      fontFamily: 'inherit',
+                      background: '#f6f2ea',
+                      color: '#274b6b',
+                      fontWeight: 600,
+                    }}
+                  >
+                    <option value="">Plan in op…</option>
+                    {days.map((d, i) => (
+                      <option key={i} value={i}>
+                        {d.wd} {d.dm} — {d.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 
@@ -819,13 +926,13 @@ function TipCard({ dot, title, fav, children }: { dot: string; title: string; fa
 }
 
 /* ===================== DOCUMENTEN ===================== */
-function Docs({ onLogout }: { onLogout: () => void }) {
+function Docs({ onLogout, userName }: { onLogout: () => void; userName: string }) {
   return (
     <div>
       <div style={{ padding: '52px 20px 10px 20px' }}>
-        <div style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 700, fontSize: 26, letterSpacing: '-.5px' }}>Documenten</div>
+        <div style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 700, fontSize: 26, letterSpacing: '-.5px' }}>Gegevens</div>
         <div style={{ width: 36, height: 3, background: '#274b6b', borderRadius: 2, marginTop: 8, marginBottom: 8 }} />
-        <div style={{ fontSize: 13, color: '#6b7580' }}>Alle belangrijke reisgegevens op één plek.</div>
+        <div style={{ fontSize: 13, color: '#6b7580' }}>Alle reisgegevens op één plek. Voeg zelf toe wat er mist — iedereen ziet het.</div>
       </div>
       <div style={{ padding: '8px 20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
         <Card>
@@ -853,26 +960,15 @@ function Docs({ onLogout }: { onLogout: () => void }) {
         <Card>
           <div style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 600, fontSize: 15, marginBottom: 12 }}>Passagiers</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <Passenger
-              name="Kevin Voskamp"
-              lines={['Volwassene', 'Ruimbagage 15 kg · handbagage 40×30×20 cm', 'kevinvoskamp@hotmail.com']}
-              border
-            />
-            <Passenger
-              name="Danielle Voskamp"
-              lines={['Volwassene · stoel 25E', 'Ruimbagage 15 kg · handbagage 40×30×20 cm', 'd.voskamp@hotmail.com']}
-              border
-            />
+            <Passenger name="Kevin Voskamp" lines={['Volwassene', 'Ruimbagage 15 kg · handbagage 40×30×20 cm']} border />
+            <Passenger name="Danielle Voskamp" lines={['Volwassene · stoel 25E', 'Ruimbagage 15 kg · handbagage 40×30×20 cm']} border />
             <Passenger name="Maura Voskamp" lines={['Kind · stoel 25F', 'Handbagage 40×30×20 cm']} border />
             <Passenger name="Lieke Voskamp" lines={['Kind · stoel 25D', 'Handbagage 40×30×20 cm']} />
           </div>
         </Card>
 
-        <Card>
-          <div style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 600, fontSize: 15, marginBottom: 8 }}>Contact</div>
-          <div style={{ fontSize: 14, fontWeight: 600 }}>Kevin Voskamp</div>
-          <div style={{ fontSize: 13, color: '#6b7580', marginTop: 2 }}>kevinvoskamp@hotmail.com</div>
-        </Card>
+        {/* eigen gegevens: taxi, hotelreservering, ... */}
+        <InfoItems userName={userName} />
 
         <button
           onClick={onLogout}
@@ -893,6 +989,102 @@ function Docs({ onLogout }: { onLogout: () => void }) {
         </button>
       </div>
     </div>
+  )
+}
+
+/** Zelf toegevoegde gegevens (taxi, hotelreservering, ...), gedeeld met het gezin */
+function InfoItems({ userName }: { userName: string }) {
+  const { items, add, remove } = useSharedList<InfoRow>('info_items', 'lissabon-info-items-v1')
+  const [open, setOpen] = useState(false)
+  const [title, setTitle] = useState('')
+  const [body, setBody] = useState('')
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    border: '1px solid #e4dccd',
+    borderRadius: 10,
+    padding: '10px 12px',
+    fontSize: 14,
+    fontFamily: 'inherit',
+    marginBottom: 10,
+  }
+
+  return (
+    <>
+      {items.map((it) => (
+        <Card key={it.id}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 600, fontSize: 15 }}>{it.title}</div>
+              {it.body && <div style={{ fontSize: 13.5, color: '#4a545c', marginTop: 6, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{it.body}</div>}
+              {it.created_by && <div style={{ fontSize: 11.5, color: '#a59c8c', marginTop: 8 }}>toegevoegd door {it.created_by}</div>}
+            </div>
+            <button
+              onClick={() => remove(it.id)}
+              title="Verwijderen"
+              style={{ border: 'none', background: 'transparent', color: '#c4a99a', width: 22, height: 22, borderRadius: 6, cursor: 'pointer', fontSize: 18, lineHeight: 1 }}
+            >
+              ×
+            </button>
+          </div>
+        </Card>
+      ))}
+
+      {!open ? (
+        <button
+          onClick={() => setOpen(true)}
+          style={{
+            width: '100%',
+            border: '1.5px dashed #c9bfae',
+            background: 'transparent',
+            color: '#6b7580',
+            fontWeight: 600,
+            fontSize: 14,
+            padding: 13,
+            borderRadius: 13,
+            cursor: 'pointer',
+          }}
+        >
+          + Gegeven toevoegen
+        </button>
+      ) : (
+        <div style={{ background: '#fff', borderRadius: 16, padding: 16, boxShadow: '0 1px 3px rgba(31,42,48,.06)' }}>
+          <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Waar gaat het over? (bijv. Taxi)" style={inputStyle} />
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder="Gegevens, tijden, reserveringsnummer…"
+            rows={4}
+            style={{ ...inputStyle, resize: 'vertical' }}
+          />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => {
+                setOpen(false)
+                setTitle('')
+                setBody('')
+              }}
+              style={{ flex: 1, border: 'none', background: '#f0ece2', color: '#6b7580', fontWeight: 600, fontSize: 14, padding: 12, borderRadius: 11, cursor: 'pointer' }}
+            >
+              Annuleren
+            </button>
+            <button
+              onClick={() => {
+                const t = title.trim()
+                if (!t) return setOpen(false)
+                add({ id: newId(), title: t, body: body.trim(), created_by: userName })
+                setOpen(false)
+                setTitle('')
+                setBody('')
+              }}
+              style={{ flex: 2, border: 'none', background: '#274b6b', color: '#f4efe6', fontWeight: 600, fontSize: 14, padding: 12, borderRadius: 11, cursor: 'pointer' }}
+            >
+              Opslaan
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 

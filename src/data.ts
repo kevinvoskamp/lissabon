@@ -68,6 +68,29 @@ export interface Activity {
   note: string
 }
 
+/** Zelf toegevoegde wens (staat in Supabase-tabel wensen_items) */
+export interface WishRow {
+  id: string
+  title: string
+  cat: CatKey
+  dur: string
+  note: string
+  created_by: string
+}
+
+/** Zelf toegevoegd gegeven (staat in Supabase-tabel info_items) */
+export interface InfoRow {
+  id: string
+  title: string
+  body: string
+  created_by: string
+}
+
+/** Een op maat toegevoegde wens als gewone Activity tonen */
+export function wishToActivity(w: WishRow): Activity {
+  return { title: w.title, cat: w.cat, dist: 'eigen idee', dur: w.dur, when: '', note: w.note }
+}
+
 export const ACTIVITIES: Activity[] = [
   {
     title: 'Praça do Comércio & Rua Augusta',

@@ -1,9 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
-import { ACTIVITIES, CATS, type Activity, type Day } from './data'
+import { ACTIVITIES, CATS, wishToActivity, type Activity, type CatKey, type WishRow } from './data'
 import { useRatings, type AllRatings } from './ratings'
+import { useSharedList, newId } from './sharedList'
 
 // Sfeer-plaatje per activiteit (zelfde volgorde als ACTIVITIES)
 const ACTIVITY_EMOJI = ['🏛️', '🍽️', '🌅', '🚋', '🏰', '🌳', '🎨', '⛪', '🐠', '🔬', '🛺', '🧚', '🏖️', '🌊']
+// Zelf toegevoegde wensen hebben geen eigen plaatje: dan maar per categorie
+const CAT_EMOJI: Record<CatKey, string> = {
+  praktisch: '📌',
+  cultuur: '🎨',
+  eten: '🍽️',
+  strand: '🏖️',
+  natuur: '🌳',
+  uitzicht: '🌅',
+}
+function emojiFor(i: number, a: Activity) {
+  return i < ACTIVITY_EMOJI.length ? ACTIVITY_EMOJI[i] : CAT_EMOJI[a.cat] || '📍'
+}
 
 // tint the category color into a soft banner gradient
 function banner(color: string) {
@@ -12,27 +25,29 @@ function banner(color: string) {
 
 export default function Wensen({
   toast,
-  onAddActivity,
   userName,
-  days,
-  activeDay,
-  setActiveDay,
+  shortTitles,
+  onToggleShort,
 }: {
   toast: string
-  onAddActivity: (a: Activity) => void
   userName: string
-  days: Day[]
-  activeDay: number
-  setActiveDay: (i: number) => void
+  shortTitles: string[]
+  onToggleShort: (a: Activity) => void
 }) {
   const { all, setRating: setRatingRemote, resetPerson, synced, shared } = useRatings()
+  const wishes = useSharedList<WishRow>('wensen_items', 'lissabon-wensen-items-v1')
   const mine = all[userName] || {}
+
+  // vaste ideeën + zelf toegevoegde wensen achter elkaar
+  const acts: Activity[] = [...ACTIVITIES, ...wishes.items.map(wishToActivity)]
+
   const [queue, setQueue] = useState<number[]>(() =>
     ACTIVITIES.map((_, i) => i).filter((i) => mine[ACTIVITIES[i].title] == null),
   )
   const [forceResults, setForceResults] = useState(false)
   const [exit, setExit] = useState<null | 'up' | 'left'>(null)
   const [hoverStar, setHoverStar] = useState(0)
+  const [addOpen, setAddOpen] = useState(false)
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const reconciled = useRef(false)
 
@@ -42,12 +57,22 @@ export default function Wensen({
   useEffect(() => {
     if (!synced || reconciled.current) return
     reconciled.current = true
-    setQueue((q) => q.filter((i) => mine[ACTIVITIES[i].title] == null))
+    setQueue((q) => q.filter((i) => mine[acts[i].title] == null))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [synced])
 
+  // Nieuwe wensen (ook die van anderen) achteraan de stapel zetten als ik ze nog niet beoordeeld heb
+  useEffect(() => {
+    setQueue((q) => {
+      const known = new Set(q)
+      const extra = acts.map((_, i) => i).filter((i) => i >= ACTIVITIES.length && !known.has(i) && mine[acts[i].title] == null)
+      return extra.length ? [...q, ...extra] : q
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wishes.items.length])
+
   const ratedCount = Object.keys(mine).length
-  const total = ACTIVITIES.length
+  const total = acts.length
   const showResults = forceResults || queue.length === 0
 
   function setRating(title: string, stars: number) {
@@ -60,7 +85,7 @@ export default function Wensen({
     setExit('up')
     clearTimeout(timer.current)
     timer.current = setTimeout(() => {
-      setRating(ACTIVITIES[idx].title, stars)
+      setRating(acts[idx].title, stars)
       setQueue((q) => q.slice(1))
       setExit(null)
       setHoverStar(0)
@@ -78,7 +103,7 @@ export default function Wensen({
   }
   function resetMine() {
     resetPerson(userName)
-    setQueue(ACTIVITIES.map((_, i) => i))
+    setQueue(acts.map((_, i) => i))
     setForceResults(false)
     setHoverStar(0)
   }
@@ -116,21 +141,53 @@ export default function Wensen({
         </div>
       )}
 
+      {/* eigen wens toevoegen */}
+      <div style={{ padding: '10px 20px 0' }}>
+        {!addOpen ? (
+          <button
+            onClick={() => setAddOpen(true)}
+            style={{
+              width: '100%',
+              border: '1.5px dashed #c9bfae',
+              background: 'transparent',
+              color: '#6b7580',
+              fontWeight: 600,
+              fontSize: 13.5,
+              padding: 11,
+              borderRadius: 12,
+              cursor: 'pointer',
+            }}
+          >
+            + Eigen idee toevoegen
+          </button>
+        ) : (
+          <AddWish
+            userName={userName}
+            onCancel={() => setAddOpen(false)}
+            onSave={(w) => {
+              wishes.add(w)
+              setAddOpen(false)
+            }}
+          />
+        )}
+      </div>
+
       {showResults ? (
         <Results
+          acts={acts}
           all={all}
           userName={userName}
           setRating={setRating}
           resetMine={resetMine}
-          onAddActivity={onAddActivity}
           remaining={queue.length}
           backToDeck={queue.length > 0 ? () => setForceResults(false) : undefined}
-          days={days}
-          activeDay={activeDay}
-          setActiveDay={setActiveDay}
+          shortTitles={shortTitles}
+          onToggleShort={onToggleShort}
+          wishes={wishes}
         />
       ) : (
         <Deck
+          act={acts[queue[0]]}
           idx={queue[0]}
           all={all}
           userName={userName}
@@ -204,6 +261,26 @@ function StaticStars({ value, size = 14 }: { value: number; size?: number }) {
   )
 }
 
+function ShortButton({ on, onClick }: { on: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        border: 'none',
+        cursor: 'pointer',
+        fontWeight: 700,
+        fontSize: 12.5,
+        padding: '8px 11px',
+        borderRadius: 10,
+        background: on ? '#274b6b' : '#f0ece2',
+        color: on ? '#f4efe6' : '#274b6b',
+      }}
+    >
+      {on ? '✓ In te plannen' : '+ In te plannen'}
+    </button>
+  )
+}
+
 // alle beoordelingen van anderen voor één activiteit
 function othersFor(all: AllRatings, userName: string, title: string) {
   return Object.keys(all)
@@ -211,7 +288,79 @@ function othersFor(all: AllRatings, userName: string, title: string) {
     .map((n) => ({ name: n, stars: all[n][title] }))
 }
 
+function AddWish({ userName, onCancel, onSave }: { userName: string; onCancel: () => void; onSave: (w: WishRow) => void }) {
+  const [title, setTitle] = useState('')
+  const [cat, setCat] = useState<CatKey>('cultuur')
+  const [dur, setDur] = useState('')
+  const [note, setNote] = useState('')
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    border: '1px solid #e4dccd',
+    borderRadius: 10,
+    padding: '10px 12px',
+    fontSize: 14,
+    fontFamily: 'inherit',
+    marginBottom: 10,
+  }
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 14, padding: 14, boxShadow: '0 1px 3px rgba(31,42,48,.06)' }}>
+      <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Wat wil je doen?" style={inputStyle} />
+      <input value={dur} onChange={(e) => setDur(e.target.value)} placeholder="Hoelang duurt het? (bijv. ±2 uur)" style={inputStyle} />
+      <textarea
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder="Korte uitleg (optioneel)"
+        rows={2}
+        style={{ ...inputStyle, resize: 'vertical' }}
+      />
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+        {(Object.keys(CATS) as CatKey[]).map((k) => {
+          const sel = cat === k
+          return (
+            <button
+              key={k}
+              onClick={() => setCat(k)}
+              style={{
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 600,
+                padding: '7px 11px',
+                borderRadius: 999,
+                ...(sel ? { background: CATS[k].color, color: '#fff' } : { background: '#f0ece2', color: '#6b7580' }),
+              }}
+            >
+              {CATS[k].label}
+            </button>
+          )
+        })}
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button
+          onClick={onCancel}
+          style={{ flex: 1, border: 'none', background: '#f0ece2', color: '#6b7580', fontWeight: 600, fontSize: 14, padding: 12, borderRadius: 11, cursor: 'pointer' }}
+        >
+          Annuleren
+        </button>
+        <button
+          onClick={() => {
+            const t = title.trim()
+            if (!t) return onCancel()
+            onSave({ id: newId(), title: t, cat, dur: dur.trim(), note: note.trim(), created_by: userName })
+          }}
+          style={{ flex: 2, border: 'none', background: '#274b6b', color: '#f4efe6', fontWeight: 600, fontSize: 14, padding: 12, borderRadius: 11, cursor: 'pointer' }}
+        >
+          Toevoegen
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function Deck(props: {
+  act: Activity
   idx: number
   all: AllRatings
   userName: string
@@ -224,9 +373,9 @@ function Deck(props: {
   left: number
   total: number
 }) {
-  const a = ACTIVITIES[props.idx]
+  const a = props.act
   const c = CATS[a.cat] || CATS.cultuur
-  const emoji = ACTIVITY_EMOJI[props.idx] || '📍'
+  const emoji = emojiFor(props.idx, a)
   const others = othersFor(props.all, props.userName, a.title)
 
   const exitStyle: React.CSSProperties =
@@ -310,7 +459,8 @@ function Deck(props: {
           </div>
           <div style={{ fontSize: 13.5, color: '#333', marginTop: 8, lineHeight: 1.45 }}>{a.note}</div>
           <div style={{ fontSize: 12.5, color: '#a17a4a', marginTop: 10, fontWeight: 600 }}>
-            Wanneer: {a.when} · Duur: {a.dur}
+            {a.when ? `Wanneer: ${a.when} · ` : ''}
+            {a.dur ? `Duur: ${a.dur}` : ''}
           </div>
 
           {others.length > 0 && (
@@ -362,20 +512,20 @@ const RATING_LABEL: Record<number, string> = {
 }
 
 function Results(props: {
+  acts: Activity[]
   all: AllRatings
   userName: string
   setRating: (title: string, n: number) => void
   resetMine: () => void
-  onAddActivity: (a: Activity) => void
   remaining: number
   backToDeck?: () => void
-  days: Day[]
-  activeDay: number
-  setActiveDay: (i: number) => void
+  shortTitles: string[]
+  onToggleShort: (a: Activity) => void
+  wishes: { items: WishRow[]; remove: (id: string) => void }
 }) {
-  const { all, userName, days, activeDay } = props
+  const { all, userName, acts } = props
 
-  const info = ACTIVITIES.map((a, i) => {
+  const info = acts.map((a, i) => {
     const rs = Object.keys(all)
       .filter((n) => all[n] && all[n][a.title] != null)
       .map((n) => ({ name: n, stars: all[n][a.title] }))
@@ -394,33 +544,6 @@ function Results(props: {
         <div style={{ fontSize: 13, color: 'rgba(244,239,230,.85)', marginTop: 4 }}>
           Gesorteerd op het totaal van alle sterren bij elkaar opgeteld. Per uitje zie je wie hoeveel sterren gaf — tik op je eigen sterren om bij te stellen.
         </div>
-      </div>
-
-      {/* naar welke dag gaat "+ In planning"? */}
-      <div style={{ background: '#fff', borderRadius: 14, padding: '12px 14px', boxShadow: '0 1px 2px rgba(31,42,48,.05)', marginBottom: 12 }}>
-        <label style={{ fontSize: 12.5, fontWeight: 600, color: '#6b7580', display: 'block', marginBottom: 7 }}>
-          Inplannen op welke dag?
-        </label>
-        <select
-          value={activeDay}
-          onChange={(e) => props.setActiveDay(Number(e.target.value))}
-          style={{
-            width: '100%',
-            border: '1px solid #e4dccd',
-            borderRadius: 10,
-            padding: '10px 11px',
-            fontSize: 14,
-            fontFamily: 'inherit',
-            background: '#fff',
-            color: '#1f2a30',
-          }}
-        >
-          {days.map((d, i) => (
-            <option key={i} value={i}>
-              {d.title} — {d.theme}
-            </option>
-          ))}
-        </select>
       </div>
 
       {rated.length === 0 && (
@@ -448,7 +571,7 @@ function Results(props: {
                     fontSize: 24,
                   }}
                 >
-                  {ACTIVITY_EMOJI[i] || '📍'}
+                  {emojiFor(i, a)}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 11.5, fontWeight: 600, color: '#6b7580', textTransform: 'uppercase', letterSpacing: 0.3 }}>
@@ -491,13 +614,19 @@ function Results(props: {
                 ))}
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-                <button
-                  onClick={() => props.onAddActivity(a)}
-                  style={{ border: 'none', background: '#f0ece2', color: '#274b6b', fontWeight: 700, fontSize: 12.5, padding: '8px 11px', borderRadius: 10, cursor: 'pointer' }}
-                >
-                  + In planning
-                </button>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
+                {props.wishes.items.some((w) => w.title === a.title) && (
+                  <button
+                    onClick={() => {
+                      const w = props.wishes.items.find((x) => x.title === a.title)
+                      if (w) props.wishes.remove(w.id)
+                    }}
+                    style={{ border: 'none', background: 'transparent', color: '#c4a99a', fontWeight: 600, fontSize: 12.5, padding: '8px 4px', borderRadius: 10, cursor: 'pointer' }}
+                  >
+                    Verwijderen
+                  </button>
+                )}
+                <ShortButton on={props.shortTitles.includes(a.title)} onClick={() => props.onToggleShort(a)} />
               </div>
             </div>
           )
@@ -528,7 +657,7 @@ function Results(props: {
                         fontSize: 24,
                       }}
                     >
-                      {ACTIVITY_EMOJI[i] || '📍'}
+                      {emojiFor(i, a)}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 11.5, fontWeight: 600, color: '#6b7580', textTransform: 'uppercase', letterSpacing: 0.3 }}>
