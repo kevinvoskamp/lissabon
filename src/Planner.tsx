@@ -211,7 +211,7 @@ export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () =
             />
           )}
           {tab === 'wensen' && <Wensen toast={toast} onAddActivity={addActivity} userName={auth.name} />}
-          {tab === 'quiz' && <Quiz />}
+          {tab === 'quiz' && <Quiz userName={auth.name} />}
           {tab === 'tips' && <Tips favBtn={favBtn} />}
           {tab === 'docs' && <Docs onLogout={onLogout} />}
         </div>
