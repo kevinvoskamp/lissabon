@@ -5,7 +5,7 @@ import Wensen from './Wensen'
 import Quiz from './Quiz'
 import type { Auth } from './Login'
 
-const KEY = 'lissabon-planner-v3'
+const KEY = 'lissabon-planner-v4'
 const FAV_KEY = 'lissabon-tips-favs'
 const HOTEL_URL = 'https://www.jamhotels.eu/lisbon'
 
@@ -637,7 +637,7 @@ function Planning(props: {
           <div style={{ textAlign: 'center', color: '#a59c8c', fontSize: 14, padding: '24px 10px' }}>
             Nog niets gepland voor deze dag.
             <br />
-            Voeg hieronder iets toe.
+            Zet er iets bij vanuit <b>Wensen</b> → "+ In planning", of voeg hieronder zelf iets toe.
           </div>
         )}
       </div>

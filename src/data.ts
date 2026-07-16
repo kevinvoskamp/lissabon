@@ -28,52 +28,18 @@ export interface Day {
 let _id = 1
 export const nid = () => 'a' + _id++
 
-function mk(title: string, cat: CatKey, note?: string): Item {
-  return { id: nid(), title, cat: cat || 'cultuur', note: note || '', done: false }
-}
-
-// Bewust grotendeels leeg: alleen de vaste ankers (vluchten, hotel, dagtrips).
-// De rest vullen jullie zelf via Ideeën en Wensen.
+// De planning begint helemaal leeg. Eerst verzamel je in Wensen alles wat je
+// wilt doen, daarna plan je dat per dag in.
 export function seed(): Day[] {
   return [
-    {
-      wd: 'Do',
-      dm: '23/7',
-      title: 'Donderdag 23 juli',
-      theme: 'Aankomst in Lissabon',
-      items: [
-        mk('Vlucht HV5243 Rotterdam → Lissabon', 'praktisch', 'Transavia, vertrek 16:00, aankomst 17:55'),
-        mk('Inchecken JAM Hotel', 'praktisch', 'Even settelen en bijkomen'),
-      ],
-    },
+    { wd: 'Do', dm: '23/7', title: 'Donderdag 23 juli', theme: 'Aankomst in Lissabon', items: [] },
     { wd: 'Vr', dm: '24/7', title: 'Vrijdag 24 juli', theme: 'Nog in te vullen', items: [] },
     { wd: 'Za', dm: '25/7', title: 'Zaterdag 25 juli', theme: 'Nog in te vullen', items: [] },
-    {
-      wd: 'Zo',
-      dm: '26/7',
-      title: 'Zondag 26 juli',
-      theme: 'Dagtrip Sintra',
-      items: [mk('Dagtrip Sintra', 'natuur', 'Trein vanaf Rossio (~40 min) — vertrek vroeg tegen de drukte')],
-    },
+    { wd: 'Zo', dm: '26/7', title: 'Zondag 26 juli', theme: 'Dagtrip Sintra', items: [] },
     { wd: 'Ma', dm: '27/7', title: 'Maandag 27 juli', theme: 'Nog in te vullen', items: [] },
-    {
-      wd: 'Di',
-      dm: '28/7',
-      title: 'Dinsdag 28 juli',
-      theme: 'Dagtrip Cascais',
-      items: [mk('Dagtrip Cascais', 'strand', 'Directe trein vanaf Cais do Sodré (35–40 min)')],
-    },
+    { wd: 'Di', dm: '28/7', title: 'Dinsdag 28 juli', theme: 'Dagtrip Cascais', items: [] },
     { wd: 'Wo', dm: '29/7', title: 'Woensdag 29 juli', theme: 'Nog in te vullen', items: [] },
-    {
-      wd: 'Do',
-      dm: '30/7',
-      title: 'Donderdag 30 juli',
-      theme: 'Vertrek',
-      items: [
-        mk('Uitchecken JAM Hotel', 'praktisch', ''),
-        mk('Terugvlucht HV5244 naar Rotterdam', 'praktisch', 'Transavia, vertrek 18:40, aankomst 22:30'),
-      ],
-    },
+    { wd: 'Do', dm: '30/7', title: 'Donderdag 30 juli', theme: 'Vertrek', items: [] },
   ]
 }
 
