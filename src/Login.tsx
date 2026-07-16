@@ -74,17 +74,8 @@ export default function Login({ onLogin }: { onLogin: (auth: Auth) => void }) {
           className="azulejo"
           style={{ position: 'relative', padding: '72px 24px 40px', color: '#f4efe6', overflow: 'hidden' }}
         >
-          <div
-            style={{
-              fontFamily: "'Bricolage Grotesque',sans-serif",
-              fontSize: 12,
-              letterSpacing: 3,
-              textTransform: 'uppercase',
-              opacity: 0.8,
-              marginBottom: 10,
-            }}
-          >
-            Familievakantie · Portugal<span className="flag-chip" />
+          <div style={{ marginBottom: 12 }}>
+            <span className="flag-pt" aria-label="Portugese vlag" role="img" />
           </div>
           <div style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 700, fontSize: 44, lineHeight: 0.95, letterSpacing: -1 }}>
             Lissabon
