@@ -28,18 +28,34 @@ export interface Day {
 let _id = 1
 export const nid = () => 'a' + _id++
 
-// De planning begint helemaal leeg. Eerst verzamel je in Wensen alles wat je
-// wilt doen, daarna plan je dat per dag in.
+function mk(title: string, cat: CatKey, note?: string): Item {
+  return { id: nid(), title, cat, note: note || '', done: false }
+}
+
+// De planning begint vrijwel leeg: alleen de vluchten staan vast. Eerst verzamel
+// je in Wensen alles wat je wilt doen, daarna plan je dat per dag in.
 export function seed(): Day[] {
   return [
-    { wd: 'Do', dm: '23/7', title: 'Donderdag 23 juli', theme: 'Aankomst in Lissabon', items: [] },
+    {
+      wd: 'Do',
+      dm: '23/7',
+      title: 'Donderdag 23 juli',
+      theme: 'Aankomst in Lissabon',
+      items: [mk('Vlucht HV5243 Rotterdam → Lissabon', 'praktisch', 'Transavia · 16:00 – 17:55')],
+    },
     { wd: 'Vr', dm: '24/7', title: 'Vrijdag 24 juli', theme: 'Nog in te vullen', items: [] },
     { wd: 'Za', dm: '25/7', title: 'Zaterdag 25 juli', theme: 'Nog in te vullen', items: [] },
     { wd: 'Zo', dm: '26/7', title: 'Zondag 26 juli', theme: 'Dagtrip Sintra', items: [] },
     { wd: 'Ma', dm: '27/7', title: 'Maandag 27 juli', theme: 'Nog in te vullen', items: [] },
     { wd: 'Di', dm: '28/7', title: 'Dinsdag 28 juli', theme: 'Dagtrip Cascais', items: [] },
     { wd: 'Wo', dm: '29/7', title: 'Woensdag 29 juli', theme: 'Nog in te vullen', items: [] },
-    { wd: 'Do', dm: '30/7', title: 'Donderdag 30 juli', theme: 'Vertrek', items: [] },
+    {
+      wd: 'Do',
+      dm: '30/7',
+      title: 'Donderdag 30 juli',
+      theme: 'Vertrek',
+      items: [mk('Terugvlucht HV5244 Lissabon → Rotterdam', 'praktisch', 'Transavia · 18:40 – 22:30')],
+    },
   ]
 }
 

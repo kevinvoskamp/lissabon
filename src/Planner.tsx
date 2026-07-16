@@ -5,7 +5,7 @@ import Wensen from './Wensen'
 import Quiz from './Quiz'
 import type { Auth } from './Login'
 
-const KEY = 'lissabon-planner-v4'
+const KEY = 'lissabon-planner-v5'
 const FAV_KEY = 'lissabon-tips-favs'
 const HOTEL_URL = 'https://www.jamhotels.eu/lisbon'
 
@@ -55,10 +55,10 @@ export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () =
   const [tab, setTab] = useState<Tab>('overview')
   const [days, setDays] = useState<Day[]>(loadDays)
   const [activeDay, setActiveDay] = useState(0)
-  const [addOpen, setAddOpen] = useState(false)
+  const [addForDay, setAddForDay] = useState<number | null>(null)
   const [draftTitle, setDraftTitle] = useState('')
   const [draftCat, setDraftCat] = useState<CatKey>('cultuur')
-  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
+  const [dragOver, setDragOver] = useState<{ day: number; idx: number } | null>(null)
   const [favTips, setFavTips] = useState<Record<string, boolean>>(loadFavs)
   const [toast, setToast] = useState('')
 
@@ -83,43 +83,43 @@ export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () =
     toastT.current = setTimeout(() => setToast(''), 2200)
   }
 
-  // ---- planning mutations ----
-  function reorder(from: number | null, to: number | null) {
+  // ---- planning mutations (per dag) ----
+  function reorder(dayIdx: number, from: number | null, to: number | null) {
     if (from == null || to == null) return
-    const items = days[activeDay].items.slice()
+    const items = days[dayIdx].items.slice()
     if (to < 0 || to >= items.length || from === to || from < 0 || from >= items.length) return
     const [m] = items.splice(from, 1)
     items.splice(to, 0, m)
     const next = days.slice()
-    next[activeDay] = { ...next[activeDay], items }
+    next[dayIdx] = { ...next[dayIdx], items }
     commit(next)
   }
-  function removeAt(i: number) {
-    const items = days[activeDay].items.slice()
+  function removeAt(dayIdx: number, i: number) {
+    const items = days[dayIdx].items.slice()
     items.splice(i, 1)
     const next = days.slice()
-    next[activeDay] = { ...next[activeDay], items }
+    next[dayIdx] = { ...next[dayIdx], items }
     commit(next)
   }
-  function toggleAt(i: number) {
-    const items = days[activeDay].items.slice()
+  function toggleAt(dayIdx: number, i: number) {
+    const items = days[dayIdx].items.slice()
     items[i] = { ...items[i], done: !items[i].done }
     const next = days.slice()
-    next[activeDay] = { ...next[activeDay], items }
+    next[dayIdx] = { ...next[dayIdx], items }
     commit(next)
   }
-  function confirmAdd() {
+  function confirmAdd(dayIdx: number) {
     const t = draftTitle.trim()
     if (!t) {
-      setAddOpen(false)
+      setAddForDay(null)
       return
     }
-    const items = days[activeDay].items.slice()
+    const items = days[dayIdx].items.slice()
     items.push({ id: nid(), title: t, cat: draftCat, note: '', done: false })
     const next = days.slice()
-    next[activeDay] = { ...next[activeDay], items }
+    next[dayIdx] = { ...next[dayIdx], items }
     commit(next)
-    setAddOpen(false)
+    setAddForDay(null)
     setDraftTitle('')
     setDraftCat('cultuur')
   }
@@ -155,7 +155,6 @@ export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () =
 
   useEffect(() => () => clearTimeout(toastT.current), [])
 
-  const day = days[activeDay] || { items: [], wd: '', dm: '', title: '', theme: '' }
   const accent = '#274b6b'
   const muted = '#a49b8b'
 
@@ -187,22 +186,15 @@ export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () =
           {tab === 'planning' && (
             <Planning
               days={days}
-              activeDay={activeDay}
-              setActiveDay={(i) => {
-                setActiveDay(i)
-                setAddOpen(false)
-                setDragOverIdx(null)
-              }}
-              day={day}
               toast={toast}
-              dragOverIdx={dragOverIdx}
-              setDragOverIdx={setDragOverIdx}
+              dragOver={dragOver}
+              setDragOver={setDragOver}
               dragIdx={dragIdx}
               reorder={reorder}
               removeAt={removeAt}
               toggleAt={toggleAt}
-              addOpen={addOpen}
-              setAddOpen={setAddOpen}
+              addForDay={addForDay}
+              setAddForDay={setAddForDay}
               draftTitle={draftTitle}
               setDraftTitle={setDraftTitle}
               draftCat={draftCat}
@@ -210,7 +202,16 @@ export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () =
               confirmAdd={confirmAdd}
             />
           )}
-          {tab === 'wensen' && <Wensen toast={toast} onAddActivity={addActivity} userName={auth.name} />}
+          {tab === 'wensen' && (
+            <Wensen
+              toast={toast}
+              onAddActivity={addActivity}
+              userName={auth.name}
+              days={days}
+              activeDay={activeDay}
+              setActiveDay={setActiveDay}
+            />
+          )}
           {tab === 'quiz' && <Quiz userName={auth.name} />}
           {tab === 'tips' && <Tips favBtn={favBtn} />}
           {tab === 'docs' && <Docs onLogout={onLogout} />}
@@ -469,25 +470,24 @@ function FlightLeg({ dir, fromT, fromP, toT, toP, nr }: { dir: string; fromT: st
 /* ===================== PLANNING ===================== */
 function Planning(props: {
   days: Day[]
-  activeDay: number
-  setActiveDay: (i: number) => void
-  day: Day
   toast: string
-  dragOverIdx: number | null
-  setDragOverIdx: (i: number | null) => void
+  dragOver: { day: number; idx: number } | null
+  setDragOver: (v: { day: number; idx: number } | null) => void
   dragIdx: React.MutableRefObject<number | null>
-  reorder: (from: number | null, to: number | null) => void
-  removeAt: (i: number) => void
-  toggleAt: (i: number) => void
-  addOpen: boolean
-  setAddOpen: (v: boolean) => void
+  reorder: (dayIdx: number, from: number | null, to: number | null) => void
+  removeAt: (dayIdx: number, i: number) => void
+  toggleAt: (dayIdx: number, i: number) => void
+  addForDay: number | null
+  setAddForDay: (v: number | null) => void
   draftTitle: string
   setDraftTitle: (v: string) => void
   draftCat: CatKey
   setDraftCat: (c: CatKey) => void
-  confirmAdd: () => void
+  confirmAdd: (dayIdx: number) => void
 }) {
-  const { days, activeDay, setActiveDay, day, toast, dragOverIdx, setDragOverIdx, dragIdx } = props
+  const { days, toast, dragOver, setDragOver, dragIdx } = props
+  const totalItems = days.reduce((s, d) => s + d.items.length, 0)
+
   const rowBase: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
@@ -501,223 +501,224 @@ function Planning(props: {
 
   return (
     <div>
-      <div style={{ padding: '52px 20px 6px 20px', background: '#f4efe6', position: 'sticky', top: 0, zIndex: 5 }}>
+      <div style={{ padding: '52px 20px 6px 20px' }}>
         <div style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 700, fontSize: 26, letterSpacing: '-.5px' }}>Planning</div>
         <div style={{ width: 36, height: 3, background: '#c56b4a', borderRadius: 2, marginTop: 8 }} />
         <div style={{ fontSize: 12.5, color: '#a59c8c', marginTop: 8 }}>
-          Geen strak uurschema — sleep de volgorde die jullie het fijnst vinden.
+          Alle dagen op een rij. Zet er dingen bij vanuit <b>Wensen</b> of tik ze hier zelf in — geen strak uurschema, sleep de volgorde die
+          jullie het fijnst vinden.
         </div>
       </div>
+
       {toast && (
-        <div style={{ margin: '0 20px 4px', background: '#274b6b', color: '#f4efe6', fontSize: 13, fontWeight: 600, padding: '9px 14px', borderRadius: 10 }}>
+        <div style={{ margin: '8px 20px 0', background: '#274b6b', color: '#f4efe6', fontSize: 13, fontWeight: 600, padding: '9px 14px', borderRadius: 10 }}>
           {toast}
         </div>
       )}
-      <div
-        className="chiprow"
-        style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '12px 20px 14px', position: 'sticky', top: 44, background: '#f4efe6', zIndex: 5 }}
-      >
-        {days.map((d, i) => {
-          const active = i === activeDay
-          return (
-            <button
-              key={i}
-              onClick={() => setActiveDay(i)}
-              style={{
-                flex: '0 0 auto',
-                minWidth: 52,
-                border: 'none',
-                cursor: 'pointer',
-                borderRadius: 13,
-                padding: '9px 6px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: 3,
-                ...(active
-                  ? { background: '#274b6b', color: '#f4efe6' }
-                  : { background: '#fff', color: '#2f3b42', boxShadow: '0 1px 2px rgba(31,42,48,.05)' }),
-              }}
-            >
-              <span style={{ fontSize: 11, fontWeight: 500, opacity: 0.7 }}>{d.wd}</span>
-              <span style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 700, fontSize: 16, lineHeight: 1 }}>{d.dm}</span>
-            </button>
-          )
-        })}
-      </div>
 
-      <div style={{ padding: '4px 20px 8px' }}>
-        <div style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 600, fontSize: 19 }}>{day.title}</div>
-        <div style={{ fontSize: 13, color: '#6b7580', marginTop: 2 }}>{day.theme}</div>
-      </div>
+      {totalItems === 0 && (
+        <div style={{ margin: '12px 20px 0', textAlign: 'center', color: '#a59c8c', fontSize: 13.5, lineHeight: 1.5 }}>
+          Nog niets gepland. Ga naar <b>Wensen</b>, geef sterren en zet favorieten hier neer.
+        </div>
+      )}
 
-      <div style={{ padding: '6px 16px 8px', display: 'flex', flexDirection: 'column', gap: 9 }}>
-        {day.items.map((it, i) => {
-          const c = CATS[it.cat] || CATS.praktisch
-          const over = dragOverIdx === i
-          return (
-            <div
-              key={it.id}
-              draggable
-              onDragStart={(e) => {
-                dragIdx.current = i
-                try {
-                  e.dataTransfer.effectAllowed = 'move'
-                } catch {
-                  /* ignore */
-                }
-              }}
-              onDragOver={(e) => {
-                e.preventDefault()
-                if (dragOverIdx !== i) setDragOverIdx(i)
-              }}
-              onDrop={(e) => {
-                e.preventDefault()
-                props.reorder(dragIdx.current, i)
-              }}
-              onDragEnd={() => {
-                setDragOverIdx(null)
-                dragIdx.current = null
-              }}
-              style={{ ...rowBase, ...(over ? { boxShadow: '0 0 0 2px #274b6b', transform: 'scale(1.01)' } : null) }}
-            >
-              <div style={{ cursor: 'grab', padding: '2px 2px', display: 'flex', alignItems: 'center' }} title="Sleep om te verplaatsen">
-                <svg width="12" height="20" viewBox="0 0 12 20">
-                  <circle cx="3" cy="4" r="1.6" fill="#c2b8a6" />
-                  <circle cx="9" cy="4" r="1.6" fill="#c2b8a6" />
-                  <circle cx="3" cy="10" r="1.6" fill="#c2b8a6" />
-                  <circle cx="9" cy="10" r="1.6" fill="#c2b8a6" />
-                  <circle cx="3" cy="16" r="1.6" fill="#c2b8a6" />
-                  <circle cx="9" cy="16" r="1.6" fill="#c2b8a6" />
-                </svg>
-              </div>
-              <span style={{ flex: '0 0 auto', width: 10, height: 10, borderRadius: '50%', background: c.color }} />
-              <div style={{ flex: 1, minWidth: 0 }} onClick={() => props.toggleAt(i)}>
-                <div style={{ fontSize: 11.5, fontWeight: 600, color: '#6b7580', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.3 }}>
-                  {c.label}
-                </div>
-                <div
-                  style={{
-                    fontSize: 15,
-                    fontWeight: 600,
-                    lineHeight: 1.25,
-                    cursor: 'pointer',
-                    ...(it.done ? { textDecoration: 'line-through', opacity: 0.45 } : null),
-                  }}
-                >
-                  {it.title}
-                </div>
-                {it.note && <div style={{ fontSize: 12.5, color: '#8a8f96', marginTop: 3, lineHeight: 1.35 }}>{it.note}</div>}
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                <button
-                  onClick={() => props.reorder(i, i - 1)}
-                  style={{ border: 'none', background: '#f0ece2', color: '#8a8f96', width: 24, height: 20, borderRadius: 6, cursor: 'pointer', fontSize: 11, lineHeight: 1 }}
-                >
-                  ▲
-                </button>
-                <button
-                  onClick={() => props.reorder(i, i + 1)}
-                  style={{ border: 'none', background: '#f0ece2', color: '#8a8f96', width: 24, height: 20, borderRadius: 6, cursor: 'pointer', fontSize: 11, lineHeight: 1 }}
-                >
-                  ▼
-                </button>
-              </div>
-              <button
-                onClick={() => props.removeAt(i)}
-                style={{ border: 'none', background: 'transparent', color: '#c4a99a', width: 22, height: 22, borderRadius: 6, cursor: 'pointer', fontSize: 18, lineHeight: 1 }}
+      <div style={{ padding: '14px 16px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {days.map((d, di) => (
+          <div key={di}>
+            {/* dagkop */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 9, padding: '0 2px' }}>
+              <span
+                style={{
+                  flex: '0 0 auto',
+                  background: '#274b6b',
+                  color: '#f4efe6',
+                  fontFamily: "'Bricolage Grotesque',sans-serif",
+                  fontWeight: 700,
+                  fontSize: 12,
+                  padding: '5px 9px',
+                  borderRadius: 8,
+                }}
               >
-                ×
-              </button>
+                {d.wd} {d.dm}
+              </span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 600, fontSize: 15, lineHeight: 1.2 }}>{d.title}</div>
+                <div style={{ fontSize: 12, color: '#a59c8c' }}>{d.theme}</div>
+              </div>
+              {d.items.length > 0 && (
+                <span style={{ flex: '0 0 auto', fontSize: 11.5, color: '#a59c8c', fontWeight: 600 }}>
+                  {d.items.length} {d.items.length === 1 ? 'ding' : 'dingen'}
+                </span>
+              )}
             </div>
-          )
-        })}
 
-        {day.items.length === 0 && (
-          <div style={{ textAlign: 'center', color: '#a59c8c', fontSize: 14, padding: '24px 10px' }}>
-            Nog niets gepland voor deze dag.
-            <br />
-            Zet er iets bij vanuit <b>Wensen</b> → "+ In planning", of voeg hieronder zelf iets toe.
-          </div>
-        )}
-      </div>
-
-      {/* add */}
-      <div style={{ padding: '8px 20px 24px' }}>
-        {!props.addOpen ? (
-          <button
-            onClick={() => props.setAddOpen(true)}
-            style={{
-              width: '100%',
-              border: '1.5px dashed #c9bfae',
-              background: 'transparent',
-              color: '#6b7580',
-              fontWeight: 600,
-              fontSize: 14,
-              padding: 14,
-              borderRadius: 14,
-              cursor: 'pointer',
-            }}
-          >
-            + Activiteit toevoegen
-          </button>
-        ) : (
-          <div style={{ background: '#fff', borderRadius: 16, padding: 16, boxShadow: '0 1px 3px rgba(31,42,48,.06)' }}>
-            <input
-              value={props.draftTitle}
-              onChange={(e) => props.setDraftTitle(e.target.value)}
-              placeholder="Wat gaan jullie doen?"
-              style={{
-                width: '100%',
-                border: '1px solid #e4dccd',
-                borderRadius: 10,
-                padding: '11px 12px',
-                fontSize: 14,
-                fontFamily: 'inherit',
-                marginBottom: 12,
-              }}
-            />
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
-              {(Object.keys(CATS) as CatKey[]).map((k) => {
-                const sel = props.draftCat === k
+            {/* items */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {d.items.map((it, i) => {
+                const c = CATS[it.cat] || CATS.praktisch
+                const over = dragOver?.day === di && dragOver?.idx === i
                 return (
-                  <button
-                    key={k}
-                    onClick={() => props.setDraftCat(k)}
-                    style={{
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      padding: '7px 11px',
-                      borderRadius: 999,
-                      ...(sel ? { background: CATS[k].color, color: '#fff' } : { background: '#f0ece2', color: '#6b7580' }),
+                  <div
+                    key={it.id}
+                    draggable
+                    onDragStart={(e) => {
+                      dragIdx.current = i
+                      try {
+                        e.dataTransfer.effectAllowed = 'move'
+                      } catch {
+                        /* ignore */
+                      }
                     }}
+                    onDragOver={(e) => {
+                      e.preventDefault()
+                      if (!over) setDragOver({ day: di, idx: i })
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      props.reorder(di, dragIdx.current, i)
+                    }}
+                    onDragEnd={() => {
+                      setDragOver(null)
+                      dragIdx.current = null
+                    }}
+                    style={{ ...rowBase, ...(over ? { boxShadow: '0 0 0 2px #274b6b', transform: 'scale(1.01)' } : null) }}
                   >
-                    {CATS[k].label}
-                  </button>
+                    <div style={{ cursor: 'grab', padding: '2px 2px', display: 'flex', alignItems: 'center' }} title="Sleep om te verplaatsen">
+                      <svg width="12" height="20" viewBox="0 0 12 20">
+                        <circle cx="3" cy="4" r="1.6" fill="#c2b8a6" />
+                        <circle cx="9" cy="4" r="1.6" fill="#c2b8a6" />
+                        <circle cx="3" cy="10" r="1.6" fill="#c2b8a6" />
+                        <circle cx="9" cy="10" r="1.6" fill="#c2b8a6" />
+                        <circle cx="3" cy="16" r="1.6" fill="#c2b8a6" />
+                        <circle cx="9" cy="16" r="1.6" fill="#c2b8a6" />
+                      </svg>
+                    </div>
+                    <span style={{ flex: '0 0 auto', width: 10, height: 10, borderRadius: '50%', background: c.color }} />
+                    <div style={{ flex: 1, minWidth: 0 }} onClick={() => props.toggleAt(di, i)}>
+                      <div style={{ fontSize: 11.5, fontWeight: 600, color: '#6b7580', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+                        {c.label}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 15,
+                          fontWeight: 600,
+                          lineHeight: 1.25,
+                          cursor: 'pointer',
+                          ...(it.done ? { textDecoration: 'line-through', opacity: 0.45 } : null),
+                        }}
+                      >
+                        {it.title}
+                      </div>
+                      {it.note && <div style={{ fontSize: 12.5, color: '#8a8f96', marginTop: 3, lineHeight: 1.35 }}>{it.note}</div>}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      <button
+                        onClick={() => props.reorder(di, i, i - 1)}
+                        style={{ border: 'none', background: '#f0ece2', color: '#8a8f96', width: 24, height: 20, borderRadius: 6, cursor: 'pointer', fontSize: 11, lineHeight: 1 }}
+                      >
+                        ▲
+                      </button>
+                      <button
+                        onClick={() => props.reorder(di, i, i + 1)}
+                        style={{ border: 'none', background: '#f0ece2', color: '#8a8f96', width: 24, height: 20, borderRadius: 6, cursor: 'pointer', fontSize: 11, lineHeight: 1 }}
+                      >
+                        ▼
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => props.removeAt(di, i)}
+                      style={{ border: 'none', background: 'transparent', color: '#c4a99a', width: 22, height: 22, borderRadius: 6, cursor: 'pointer', fontSize: 18, lineHeight: 1 }}
+                    >
+                      ×
+                    </button>
+                  </div>
                 )
               })}
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                onClick={() => {
-                  props.setAddOpen(false)
-                  props.setDraftTitle('')
-                }}
-                style={{ flex: 1, border: 'none', background: '#f0ece2', color: '#6b7580', fontWeight: 600, fontSize: 14, padding: 12, borderRadius: 11, cursor: 'pointer' }}
-              >
-                Annuleren
-              </button>
-              <button
-                onClick={props.confirmAdd}
-                style={{ flex: 2, border: 'none', background: '#274b6b', color: '#f4efe6', fontWeight: 600, fontSize: 14, padding: 12, borderRadius: 11, cursor: 'pointer' }}
-              >
-                Toevoegen
-              </button>
+
+            {/* toevoegen */}
+            <div style={{ marginTop: d.items.length ? 8 : 0 }}>
+              {props.addForDay !== di ? (
+                <button
+                  onClick={() => {
+                    props.setAddForDay(di)
+                    props.setDraftTitle('')
+                  }}
+                  style={{
+                    width: '100%',
+                    border: '1.5px dashed #d5cbba',
+                    background: 'transparent',
+                    color: '#a59c8c',
+                    fontWeight: 600,
+                    fontSize: 13,
+                    padding: 10,
+                    borderRadius: 12,
+                    cursor: 'pointer',
+                  }}
+                >
+                  + Toevoegen aan {d.wd} {d.dm}
+                </button>
+              ) : (
+                <div style={{ background: '#fff', borderRadius: 14, padding: 14, boxShadow: '0 1px 3px rgba(31,42,48,.06)' }}>
+                  <input
+                    autoFocus
+                    value={props.draftTitle}
+                    onChange={(e) => props.setDraftTitle(e.target.value)}
+                    placeholder="Wat gaan jullie doen?"
+                    style={{
+                      width: '100%',
+                      border: '1px solid #e4dccd',
+                      borderRadius: 10,
+                      padding: '11px 12px',
+                      fontSize: 14,
+                      fontFamily: 'inherit',
+                      marginBottom: 12,
+                    }}
+                  />
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+                    {(Object.keys(CATS) as CatKey[]).map((k) => {
+                      const sel = props.draftCat === k
+                      return (
+                        <button
+                          key={k}
+                          onClick={() => props.setDraftCat(k)}
+                          style={{
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: 12,
+                            fontWeight: 600,
+                            padding: '7px 11px',
+                            borderRadius: 999,
+                            ...(sel ? { background: CATS[k].color, color: '#fff' } : { background: '#f0ece2', color: '#6b7580' }),
+                          }}
+                        >
+                          {CATS[k].label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={() => {
+                        props.setAddForDay(null)
+                        props.setDraftTitle('')
+                      }}
+                      style={{ flex: 1, border: 'none', background: '#f0ece2', color: '#6b7580', fontWeight: 600, fontSize: 14, padding: 12, borderRadius: 11, cursor: 'pointer' }}
+                    >
+                      Annuleren
+                    </button>
+                    <button
+                      onClick={() => props.confirmAdd(di)}
+                      style={{ flex: 2, border: 'none', background: '#274b6b', color: '#f4efe6', fontWeight: 600, fontSize: 14, padding: 12, borderRadius: 11, cursor: 'pointer' }}
+                    >
+                      Toevoegen
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-        )}
+        ))}
       </div>
     </div>
   )
@@ -863,23 +864,23 @@ function Docs({ onLogout }: { onLogout: () => void }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <Passenger
               name="Kevin Voskamp"
-              lines={['Volwassene · geb. 2-5-1987', 'Ruimbagage 15 kg · handbagage 40×30×20 cm', 'kevinvoskamp@hotmail.com · +31 6 23718928']}
+              lines={['Volwassene', 'Ruimbagage 15 kg · handbagage 40×30×20 cm', 'kevinvoskamp@hotmail.com']}
               border
             />
             <Passenger
               name="Danielle Voskamp"
-              lines={['Volwassene · geb. 26-2-1990 · stoel 25E', 'Ruimbagage 15 kg · handbagage 40×30×20 cm', 'd.voskamp@hotmail.com · +31 6 20857364']}
+              lines={['Volwassene · stoel 25E', 'Ruimbagage 15 kg · handbagage 40×30×20 cm', 'd.voskamp@hotmail.com']}
               border
             />
-            <Passenger name="Maura Voskamp" lines={['Kind · geb. 20-5-2015 · stoel 25F', 'Handbagage 40×30×20 cm']} border />
-            <Passenger name="Lieke Voskamp" lines={['Kind · geb. 8-5-2017 · stoel 25D', 'Handbagage 40×30×20 cm']} />
+            <Passenger name="Maura Voskamp" lines={['Kind · stoel 25F', 'Handbagage 40×30×20 cm']} border />
+            <Passenger name="Lieke Voskamp" lines={['Kind · stoel 25D', 'Handbagage 40×30×20 cm']} />
           </div>
         </Card>
 
         <Card>
           <div style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 600, fontSize: 15, marginBottom: 8 }}>Contact</div>
           <div style={{ fontSize: 14, fontWeight: 600 }}>Kevin Voskamp</div>
-          <div style={{ fontSize: 13, color: '#6b7580', marginTop: 2 }}>+31 6 23718928 · kevinvoskamp@hotmail.com</div>
+          <div style={{ fontSize: 13, color: '#6b7580', marginTop: 2 }}>kevinvoskamp@hotmail.com</div>
         </Card>
 
         <button

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ACTIVITIES, CATS, type Activity } from './data'
+import { ACTIVITIES, CATS, type Activity, type Day } from './data'
 import { useRatings, type AllRatings } from './ratings'
 
 // Sfeer-plaatje per activiteit (zelfde volgorde als ACTIVITIES)
@@ -14,10 +14,16 @@ export default function Wensen({
   toast,
   onAddActivity,
   userName,
+  days,
+  activeDay,
+  setActiveDay,
 }: {
   toast: string
   onAddActivity: (a: Activity) => void
   userName: string
+  days: Day[]
+  activeDay: number
+  setActiveDay: (i: number) => void
 }) {
   const { all, setRating: setRatingRemote, resetPerson, synced, shared } = useRatings()
   const mine = all[userName] || {}
@@ -119,6 +125,9 @@ export default function Wensen({
           onAddActivity={onAddActivity}
           remaining={queue.length}
           backToDeck={queue.length > 0 ? () => setForceResults(false) : undefined}
+          days={days}
+          activeDay={activeDay}
+          setActiveDay={setActiveDay}
         />
       ) : (
         <Deck
@@ -360,8 +369,11 @@ function Results(props: {
   onAddActivity: (a: Activity) => void
   remaining: number
   backToDeck?: () => void
+  days: Day[]
+  activeDay: number
+  setActiveDay: (i: number) => void
 }) {
-  const { all, userName } = props
+  const { all, userName, days, activeDay } = props
 
   const info = ACTIVITIES.map((a, i) => {
     const rs = Object.keys(all)
@@ -382,6 +394,33 @@ function Results(props: {
         <div style={{ fontSize: 13, color: 'rgba(244,239,230,.85)', marginTop: 4 }}>
           Gesorteerd op het totaal van alle sterren bij elkaar opgeteld. Per uitje zie je wie hoeveel sterren gaf — tik op je eigen sterren om bij te stellen.
         </div>
+      </div>
+
+      {/* naar welke dag gaat "+ In planning"? */}
+      <div style={{ background: '#fff', borderRadius: 14, padding: '12px 14px', boxShadow: '0 1px 2px rgba(31,42,48,.05)', marginBottom: 12 }}>
+        <label style={{ fontSize: 12.5, fontWeight: 600, color: '#6b7580', display: 'block', marginBottom: 7 }}>
+          Inplannen op welke dag?
+        </label>
+        <select
+          value={activeDay}
+          onChange={(e) => props.setActiveDay(Number(e.target.value))}
+          style={{
+            width: '100%',
+            border: '1px solid #e4dccd',
+            borderRadius: 10,
+            padding: '10px 11px',
+            fontSize: 14,
+            fontFamily: 'inherit',
+            background: '#fff',
+            color: '#1f2a30',
+          }}
+        >
+          {days.map((d, i) => (
+            <option key={i} value={i}>
+              {d.title} — {d.theme}
+            </option>
+          ))}
+        </select>
       </div>
 
       {rated.length === 0 && (
