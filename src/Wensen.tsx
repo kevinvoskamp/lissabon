@@ -35,7 +35,7 @@ export default function Wensen({
   onToggleShort: (a: Activity) => void
 }) {
   const { all, setRating: setRatingRemote, resetPerson, synced, shared } = useRatings()
-  const wishes = useSharedList<WishRow>('wensen_items', 'lissabon-wensen-items-v1')
+  const wishes = useSharedList<WishRow>('lsb_wensen_items', 'lissabon-wensen-items-v1')
   const mine = all[userName] || {}
 
   // vaste ideeën + zelf toegevoegde wensen achter elkaar

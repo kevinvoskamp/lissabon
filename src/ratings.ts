@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase, isSupabaseConfigured } from './lib/supabase'
 
 const CACHE_KEY = 'lissabon-wensen-v2'
-const TABLE = 'wensen_ratings'
+const TABLE = 'lsb_wensen_ratings'
 
 // { [naam]: { [activiteit-titel]: sterren } }
 export type AllRatings = Record<string, Record<string, number>>

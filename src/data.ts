@@ -73,7 +73,7 @@ export interface Activity {
   note: string
 }
 
-/** Zelf toegevoegde wens (staat in Supabase-tabel wensen_items) */
+/** Zelf toegevoegde wens (staat in Supabase-tabel lsb_wensen_items) */
 export interface WishRow {
   id: string
   title: string
@@ -83,7 +83,7 @@ export interface WishRow {
   created_by: string
 }
 
-/** Zelf toegevoegd gegeven (staat in Supabase-tabel info_items) */
+/** Zelf toegevoegd gegeven (staat in Supabase-tabel lsb_info_items) */
 export interface InfoRow {
   id: string
   title: string
@@ -210,6 +210,33 @@ export const ACTIVITIES: Activity[] = [
     note: 'Breed zandstrand aan de overkant van de brug, populair bij lokale gezinnen en iets rustiger dan de stadsstranden.',
   },
 ]
+
+// Ligging per activiteit (zelfde volgorde als ACTIVITIES), voor de kaart.
+// zone groepeert wat je goed op één dag kunt combineren.
+export interface Geo {
+  zone: string
+  lat: number
+  lng: number
+  dayTrip?: boolean
+}
+export const ACTIVITY_GEO: Geo[] = [
+  { zone: 'Baixa & Alfama', lat: 38.7077, lng: -9.1365 }, // Praça do Comércio
+  { zone: 'Cais do Sodré', lat: 38.7067, lng: -9.1459 }, // Time Out Market
+  { zone: 'Baixa & Alfama', lat: 38.7118, lng: -9.13 }, // Miradouro Santa Luzia
+  { zone: 'Baixa & Alfama', lat: 38.7112, lng: -9.1302 }, // Tram 28
+  { zone: 'Baixa & Alfama', lat: 38.7139, lng: -9.1335 }, // Castelo São Jorge
+  { zone: 'Centrum-noord', lat: 38.7276, lng: -9.1526 }, // Parque Eduardo VII
+  { zone: 'Belém & LX', lat: 38.7024, lng: -9.1786 }, // LX Factory
+  { zone: 'Belém & LX', lat: 38.6968, lng: -9.2065 }, // Jerónimos & Torre
+  { zone: 'Parque das Nações', lat: 38.7635, lng: -9.0937 }, // Oceanário
+  { zone: 'Parque das Nações', lat: 38.7639, lng: -9.0945 }, // Pavilhão
+  { zone: 'Vlak bij het hotel', lat: 38.7068, lng: -9.156 }, // Tuktuk (hotel)
+  { zone: 'Dagtrips', lat: 38.7876, lng: -9.3904, dayTrip: true }, // Sintra
+  { zone: 'Dagtrips', lat: 38.6979, lng: -9.4215, dayTrip: true }, // Cascais
+  { zone: 'Dagtrips', lat: 38.6444, lng: -9.2357, dayTrip: true }, // Costa da Caparica
+]
+// JAM Hotel Lissabon (Santos)
+export const HOTEL_GEO = { lat: 38.7068, lng: -9.156 }
 
 export interface QuizItem {
   q: string

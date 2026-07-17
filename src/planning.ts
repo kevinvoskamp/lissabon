@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from './lib/supabase'
 import { DAY_META, FLIGHT_SEED, type CatKey, type Day, type Item } from './data'
 
-const TABLE = 'planning_items'
+const TABLE = 'lsb_planning_items'
 const CACHE = 'lissabon-planning-rows-v1'
 export const SHORT_DAY = -1
 

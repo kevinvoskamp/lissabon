@@ -45,7 +45,7 @@ export default function Quiz({ userName }: { userName: string }) {
 
   const loadResults = useCallback(async () => {
     if (!supabase) return
-    const { data } = await supabase.from('quiz_results').select('person,score,seconds').eq('quiz_day', day)
+    const { data } = await supabase.from('lsb_quiz_results').select('person,score,seconds').eq('quiz_day', day)
     if (!data) return
     setResults(data as Result[])
     // al gespeeld vandaag? dan meteen de uitslag tonen
@@ -93,7 +93,7 @@ export default function Quiz({ userName }: { userName: string }) {
     setResults((prev) => [...prev.filter((r) => r.person !== userName), { person: userName, score: finalScore, seconds: secs }])
     if (supabase) {
       const { error } = await supabase
-        .from('quiz_results')
+        .from('lsb_quiz_results')
         .upsert({ person: userName, quiz_day: day, score: finalScore, seconds: secs }, { onConflict: 'person,quiz_day' })
       if (error) console.warn('Quiz-uitslag niet opgeslagen:', error.message)
       else loadResults()

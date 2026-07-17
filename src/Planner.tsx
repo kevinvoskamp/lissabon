@@ -5,12 +5,13 @@ import { useSharedList, newId } from './sharedList'
 import { usePlanning, type ShortItem } from './planning'
 import Wensen from './Wensen'
 import Quiz from './Quiz'
+import Kaart from './Kaart'
 import type { Auth } from './Login'
 
 const FAV_KEY = 'lissabon-tips-favs'
 const HOTEL_URL = 'https://www.jamhotels.eu/lisbon'
 
-type Tab = 'overview' | 'wensen' | 'planning' | 'quiz' | 'tips' | 'docs'
+type Tab = 'overview' | 'wensen' | 'kaart' | 'planning' | 'quiz' | 'tips' | 'docs'
 
 function loadFavs(): Record<string, boolean> {
   try {
@@ -118,12 +119,13 @@ export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () =
   const muted = '#a49b8b'
 
   const navItems: { key: Tab; label: string; icon: string }[] = [
-    { key: 'overview', label: 'Overzicht', icon: '🏠' },
+    { key: 'overview', label: 'Start', icon: '🏠' },
     { key: 'wensen', label: 'Wensen', icon: '⭐' },
+    { key: 'kaart', label: 'Kaart', icon: '🗺️' },
     { key: 'planning', label: 'Planning', icon: '📅' },
     { key: 'quiz', label: 'Quiz', icon: '🧠' },
     { key: 'tips', label: 'Tips', icon: '🎒' },
-    { key: 'docs', label: 'Gegevens', icon: '🎫' },
+    { key: 'docs', label: 'Info', icon: '🎫' },
   ]
 
   return (
@@ -172,6 +174,7 @@ export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () =
               onToggleShort={toggleShort}
             />
           )}
+          {tab === 'kaart' && <Kaart />}
           {tab === 'quiz' && <Quiz userName={auth.name} />}
           {tab === 'tips' && <Tips favBtn={favBtn} />}
           {tab === 'docs' && <Docs onLogout={onLogout} userName={auth.name} />}
@@ -189,7 +192,7 @@ export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () =
             background: '#fff',
             display: 'flex',
             alignItems: 'stretch',
-            padding: '0 8px 14px',
+            padding: '0 4px 14px',
           }}
         >
           {navItems.map((n) => {
@@ -200,6 +203,7 @@ export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () =
                 onClick={() => setTab(n.key)}
                 style={{
                   flex: 1,
+                  minWidth: 0,
                   border: 'none',
                   background: 'transparent',
                   cursor: 'pointer',
@@ -207,13 +211,13 @@ export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () =
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'flex-end',
-                  gap: 5,
+                  gap: 4,
                   paddingTop: 12,
                 }}
               >
                 <span
                   style={{
-                    fontSize: 19,
+                    fontSize: 18,
                     lineHeight: 1,
                     filter: on ? 'none' : 'grayscale(1) opacity(.45)',
                     transform: on ? 'scale(1.08)' : 'none',
@@ -222,7 +226,7 @@ export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () =
                 >
                   {n.icon}
                 </span>
-                <span style={{ fontSize: 11, fontWeight: 600, color: on ? accent : muted }}>{n.label}</span>
+                <span style={{ fontSize: 10, fontWeight: 600, color: on ? accent : muted }}>{n.label}</span>
               </button>
             )
           })}
@@ -912,7 +916,7 @@ function Docs({ onLogout, userName }: { onLogout: () => void; userName: string }
 
 /** Zelf toegevoegde gegevens (taxi, hotelreservering, ...), gedeeld met het gezin */
 function InfoItems({ userName }: { userName: string }) {
-  const { items, add, remove } = useSharedList<InfoRow>('info_items', 'lissabon-info-items-v1')
+  const { items, add, remove } = useSharedList<InfoRow>('lsb_info_items', 'lissabon-info-items-v1')
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
