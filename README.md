@@ -52,6 +52,11 @@ npm run build      # typecheck + productie-build naar dist/
 npm run preview    # preview van de build
 ```
 
+## Live
+
+De app draait op Vercel en deelt gegevens via Supabase (project `ninfwxdnsptwiowlisqp`,
+tabellen met prefix `lsb_`). De Supabase-waarden staan als environment variables in Vercel.
+
 ## Techniek
 
 - React 18 + TypeScript, Vite 5
