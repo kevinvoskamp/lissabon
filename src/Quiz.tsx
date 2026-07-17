@@ -30,15 +30,44 @@ interface Result {
 
 type Phase = 'start' | 'playing' | 'done'
 
+// Lokaal dagslot: onthoudt per persoon welke dag ze de quiz afmaakten, zodat je
+// ook zonder werkende Supabase maar één keer per dag kunt spelen.
+const DONE_KEY = 'lsb-quiz-done'
+type DoneMap = Record<string, { day: string; score: number; seconds: number }>
+function loadDone(): DoneMap {
+  try {
+    const s = localStorage.getItem(DONE_KEY)
+    if (s) return JSON.parse(s)
+  } catch {
+    /* ignore */
+  }
+  return {}
+}
+function saveDone(person: string, day: string, score: number, seconds: number) {
+  try {
+    const m = loadDone()
+    m[person] = { day, score, seconds }
+    localStorage.setItem(DONE_KEY, JSON.stringify(m))
+  } catch {
+    /* ignore */
+  }
+}
+
 export default function Quiz({ userName }: { userName: string }) {
   const qSet = QUIZ_SETS[quizSetIndex()]
   const day = todayKey()
 
-  const [phase, setPhase] = useState<Phase>('start')
+  // al gespeeld vandaag (dit apparaat)?
+  const doneToday = (() => {
+    const d = loadDone()[userName]
+    return d && d.day === day ? d : null
+  })()
+
+  const [phase, setPhase] = useState<Phase>(doneToday ? 'done' : 'start')
   const [qi, setQi] = useState(0)
   const [chosen, setChosen] = useState<number | null>(null)
-  const [score, setScore] = useState(0)
-  const [elapsed, setElapsed] = useState(0)
+  const [score, setScore] = useState(doneToday ? doneToday.score : 0)
+  const [elapsed, setElapsed] = useState(doneToday ? doneToday.seconds : 0)
   const [results, setResults] = useState<Result[]>([])
   const startedAt = useRef(0)
   const ticker = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
@@ -48,8 +77,14 @@ export default function Quiz({ userName }: { userName: string }) {
     const { data } = await supabase.from('lsb_quiz_results').select('person,score,seconds').eq('quiz_day', day)
     if (!data) return
     setResults(data as Result[])
-    // al gespeeld vandaag? dan meteen de uitslag tonen
-    if ((data as Result[]).some((r) => r.person === userName)) setPhase('done')
+    // al gespeeld vandaag op een ander apparaat? dan hier ook de uitslag tonen + dagslot zetten
+    const mineRow = (data as Result[]).find((r) => r.person === userName)
+    if (mineRow) {
+      setPhase('done')
+      setScore(mineRow.score)
+      setElapsed(mineRow.seconds)
+      saveDone(userName, day, mineRow.score, mineRow.seconds)
+    }
   }, [day, userName])
 
   useEffect(() => {
@@ -90,6 +125,7 @@ export default function Quiz({ userName }: { userName: string }) {
     clearInterval(ticker.current)
     setElapsed(secs)
     setPhase('done')
+    saveDone(userName, day, finalScore, secs)
     setResults((prev) => [...prev.filter((r) => r.person !== userName), { person: userName, score: finalScore, seconds: secs }])
     if (supabase) {
       const { error } = await supabase
@@ -102,7 +138,6 @@ export default function Quiz({ userName }: { userName: string }) {
 
   // winnaar: hoogste score, dan snelste tijd
   const ranked = [...results].sort((a, b) => b.score - a.score || a.seconds - b.seconds)
-  const mine = ranked.find((r) => r.person === userName)
 
   return (
     <div>
@@ -191,10 +226,10 @@ export default function Quiz({ userName }: { userName: string }) {
           <div style={{ background: '#274b6b', borderRadius: 16, padding: 22, color: '#f4efe6', textAlign: 'center' }}>
             <div style={{ fontSize: 34, lineHeight: 1 }}>{ranked[0]?.person === userName ? '🏆' : '✅'}</div>
             <div style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 700, fontSize: 20, marginTop: 8 }}>
-              {mine ? `${mine.score}/${qSet.length} in ${fmtTime(mine.seconds)}` : 'Uitslag'}
+              {score}/{qSet.length} in {fmtTime(elapsed)}
             </div>
             <div style={{ fontSize: 13, color: 'rgba(244,239,230,.85)', marginTop: 6 }}>
-              Je quiz van vandaag zit erop. Morgen staan er vijf nieuwe vragen klaar.
+              Je quiz van vandaag zit erop — je kunt maar één keer per dag meedoen. Kom morgen terug voor vijf nieuwe vragen! 🌅
             </div>
           </div>
         )}
