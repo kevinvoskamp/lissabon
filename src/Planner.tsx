@@ -1,49 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
-import { CATS, seed, nid, type Activity, type CatKey, type Day, type InfoRow } from './data'
+import { CATS, type Activity, type CatKey, type Day, type InfoRow } from './data'
 import { useWeather } from './useWeather'
 import { useSharedList, newId } from './sharedList'
+import { usePlanning, type ShortItem } from './planning'
 import Wensen from './Wensen'
 import Quiz from './Quiz'
 import type { Auth } from './Login'
 
-const KEY = 'lissabon-planner-v5'
 const FAV_KEY = 'lissabon-tips-favs'
-const SHORT_KEY = 'lissabon-shortlist-v1'
 const HOTEL_URL = 'https://www.jamhotels.eu/lisbon'
 
 type Tab = 'overview' | 'wensen' | 'planning' | 'quiz' | 'tips' | 'docs'
-
-function loadDays(): Day[] {
-  try {
-    const s = localStorage.getItem(KEY)
-    if (s) {
-      const d = JSON.parse(s)
-      if (Array.isArray(d) && d.length) return d
-    }
-  } catch {
-    /* ignore */
-  }
-  return seed()
-}
-
-/** Wensen die je wilt inplannen, maar nog geen dag hebben. */
-export interface ShortItem {
-  id: string
-  title: string
-  cat: CatKey
-  dur: string
-  note: string
-}
-
-function loadShortlist(): ShortItem[] {
-  try {
-    const s = localStorage.getItem(SHORT_KEY)
-    if (s) return JSON.parse(s)
-  } catch {
-    /* ignore */
-  }
-  return []
-}
 
 function loadFavs(): Record<string, boolean> {
   try {
@@ -74,8 +41,8 @@ function countdownText(): string {
 
 export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () => void }) {
   const [tab, setTab] = useState<Tab>('overview')
-  const [days, setDays] = useState<Day[]>(loadDays)
-  const [shortlist, setShortlist] = useState<ShortItem[]>(loadShortlist)
+  const planning = usePlanning()
+  const { days, shortlist } = planning
   const [addForDay, setAddForDay] = useState<number | null>(null)
   const [draftTitle, setDraftTitle] = useState('')
   const [draftCat, setDraftCat] = useState<CatKey>('cultuur')
@@ -86,48 +53,24 @@ export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () =
   const dragIdx = useRef<number | null>(null)
   const toastT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
-  function persist(next: Day[]) {
-    try {
-      localStorage.setItem(KEY, JSON.stringify(next))
-    } catch {
-      /* ignore */
-    }
-  }
-  function commit(next: Day[]) {
-    persist(next)
-    setDays(next)
-  }
-
   function showToast(msg: string) {
     setToast(msg)
     clearTimeout(toastT.current)
     toastT.current = setTimeout(() => setToast(''), 2200)
   }
 
-  // ---- planning mutations (per dag) ----
+  // ---- planning: adapters van index (per dag) naar de gedeelde hook ----
   function reorder(dayIdx: number, from: number | null, to: number | null) {
     if (from == null || to == null) return
-    const items = days[dayIdx].items.slice()
-    if (to < 0 || to >= items.length || from === to || from < 0 || from >= items.length) return
-    const [m] = items.splice(from, 1)
-    items.splice(to, 0, m)
-    const next = days.slice()
-    next[dayIdx] = { ...next[dayIdx], items }
-    commit(next)
+    planning.reorder(dayIdx, from, to)
   }
   function removeAt(dayIdx: number, i: number) {
-    const items = days[dayIdx].items.slice()
-    items.splice(i, 1)
-    const next = days.slice()
-    next[dayIdx] = { ...next[dayIdx], items }
-    commit(next)
+    const it = days[dayIdx].items[i]
+    if (it) planning.removeItem(it.id)
   }
   function toggleAt(dayIdx: number, i: number) {
-    const items = days[dayIdx].items.slice()
-    items[i] = { ...items[i], done: !items[i].done }
-    const next = days.slice()
-    next[dayIdx] = { ...next[dayIdx], items }
-    commit(next)
+    const it = days[dayIdx].items[i]
+    if (it) planning.toggleDone(it.id)
   }
   function confirmAdd(dayIdx: number) {
     const t = draftTitle.trim()
@@ -135,43 +78,18 @@ export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () =
       setAddForDay(null)
       return
     }
-    const items = days[dayIdx].items.slice()
-    items.push({ id: nid(), title: t, cat: draftCat, note: '', done: false })
-    const next = days.slice()
-    next[dayIdx] = { ...next[dayIdx], items }
-    commit(next)
+    planning.addItem(dayIdx, { title: t, cat: draftCat })
     setAddForDay(null)
     setDraftTitle('')
     setDraftCat('cultuur')
   }
-  // ---- shortlist: wensen die nog een dag moeten krijgen ----
-  function saveShort(next: ShortItem[]) {
-    try {
-      localStorage.setItem(SHORT_KEY, JSON.stringify(next))
-    } catch {
-      /* ignore */
-    }
-    setShortlist(next)
-  }
   function toggleShort(a: Activity) {
-    const existing = shortlist.find((s) => s.title === a.title)
-    if (existing) {
-      saveShort(shortlist.filter((s) => s.title !== a.title))
-      showToast('Van de lijst gehaald')
-      return
-    }
-    saveShort([...shortlist, { id: nid(), title: a.title, cat: a.cat, dur: a.dur, note: a.note }])
-    showToast('Op de lijst — plan hem in bij Planning')
+    const added = planning.toggleShort({ title: a.title, cat: a.cat, dur: a.dur, note: a.note })
+    showToast(added ? 'Op de lijst — plan hem in bij Planning' : 'Van de lijst gehaald')
   }
   function planShort(item: ShortItem, dayIdx: number) {
-    const items = days[dayIdx].items.slice()
-    // duur mee in de notitie, zodat je bij het inplannen ziet hoeveel tijd het kost
-    items.push({ id: nid(), title: item.title, cat: item.cat, note: item.dur ? item.dur + ' · ' + item.note : item.note, done: false })
-    const next = days.slice()
-    next[dayIdx] = { ...next[dayIdx], items }
-    commit(next)
-    saveShort(shortlist.filter((s) => s.id !== item.id))
-    const d = next[dayIdx]
+    planning.moveToDay(item.id, dayIdx)
+    const d = days[dayIdx]
     showToast('Ingepland op ' + d.wd + ' ' + d.dm)
   }
 
@@ -243,7 +161,7 @@ export default function Planner({ auth, onLogout }: { auth: Auth; onLogout: () =
               confirmAdd={confirmAdd}
               shortlist={shortlist}
               planShort={planShort}
-              dropShort={(id) => saveShort(shortlist.filter((s) => s.id !== id))}
+              dropShort={(id) => planning.removeItem(id)}
             />
           )}
           {tab === 'wensen' && (
