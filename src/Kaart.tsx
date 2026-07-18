@@ -2,11 +2,39 @@ import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { ACTIVITIES, ACTIVITY_GEO, CATS, HOTEL_GEO } from './data'
+import { useRatings } from './ratings'
 
 const POINTS = ACTIVITIES.map((a, i) => ({ i, a, geo: ACTIVITY_GEO[i], n: i + 1 }))
 const CITY = POINTS.filter((p) => !p.geo.dayTrip)
 
 const ZONE_ORDER = ['Baixa & Alfama', 'Cais do Sodré', 'Centrum-noord', 'Belém & LX', 'Parque das Nações', 'Vlak bij het hotel', 'Dagtrips']
+
+// Gemiddelde sterren van het gezin, naast een plek in de lijst
+function Score({ info }: { info: { avg: number; count: number } | null }) {
+  if (!info)
+    return (
+      <span style={{ flex: '0 0 auto', fontSize: 11, color: '#c2b8a6', fontWeight: 600 }} title="Nog niemand heeft dit beoordeeld">
+        –
+      </span>
+    )
+  return (
+    <span
+      style={{
+        flex: '0 0 auto',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-end',
+        lineHeight: 1.15,
+      }}
+      title={`Gemiddelde van ${info.count} ${info.count === 1 ? 'persoon' : 'personen'}`}
+    >
+      <span style={{ fontFamily: "'Bricolage Grotesque',sans-serif", fontWeight: 700, fontSize: 13.5, color: '#a17a4a' }}>
+        ★ {info.avg.toFixed(1).replace('.', ',')}
+      </span>
+      <span style={{ fontSize: 10, color: '#a59c8c' }}>{info.count} pers.</span>
+    </span>
+  )
+}
 
 // Genummerde speld in de categoriekleur
 function pinIcon(n: number, color: string) {
@@ -38,6 +66,16 @@ export default function Kaart() {
   const elRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
   const [scope, setScope] = useState<'stad' | 'alles'>('stad')
+  const { all } = useRatings()
+
+  // gemiddelde sterren van het hele gezin voor één activiteit
+  function avgFor(title: string) {
+    const vals = Object.keys(all)
+      .map((p) => all[p]?.[title])
+      .filter((v): v is number => v != null)
+    if (!vals.length) return null
+    return { avg: vals.reduce((s, v) => s + v, 0) / vals.length, count: vals.length }
+  }
 
   // kaart eenmalig opbouwen
   useEffect(() => {
@@ -175,6 +213,7 @@ export default function Kaart() {
                         {c.label} · {p.a.dist} v.a. hotel · ⏱ {p.a.dur}
                       </div>
                     </div>
+                    <Score info={avgFor(p.a.title)} />
                   </div>
                 )
               })}
